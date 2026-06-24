@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "arix-algo"
+version = "0.1.0"
+description = "Next-generation AI architecture with security built into the foundation"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "ARIX", email = "ammar@arix.dev"}
+]
+keywords = ["ai", "machine-learning", "neural-networks", "security"]
+
+[project.urls]
+Homepage = "https://algogit.com"
+Repository = "https://github.com/ARIX-Algo"
+
+[tool.setuptools.packages.find]
+where = ["src/python"]

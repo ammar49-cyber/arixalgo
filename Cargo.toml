@@ -1,0 +1,10 @@
+[package]
+name = "arix-distributed"
+version = "0.1.0"
+edition = "2021"
+authors = ["ARIX <ammar@arix.dev>"]
+description = "Distributed training and networking for ARIX-Algo"
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
