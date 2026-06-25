@@ -40,3 +40,12 @@ target_include_directories(security_stress PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/include
     ${CMAKE_SOURCE_DIR}/src/arch/include
 )
+
+add_executable(obf_demo obf_demo.cpp)
+target_link_libraries(obf_demo arix_security_cpp arix_security_c arix_core arix_arch)
+target_include_directories(obf_demo PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/security/cpp/include
+    ${CMAKE_SOURCE_DIR}/src/security/c/include
+    ${CMAKE_SOURCE_DIR}/src/core/include
+    ${CMAKE_SOURCE_DIR}/src/arch/include
+)

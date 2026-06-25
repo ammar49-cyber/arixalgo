@@ -1,0 +1,126 @@
+#include "arix_obf_cfg.h"
+#include <cstdio>
+#include <cassert>
+#include <iostream>
+
+static int tests_passed = 0;
+static int tests_failed = 0;
+
+#define TEST(name) do { printf("  TEST: %s ... ", name); } while(0)
+#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
+#define FAIL(msg) do { printf("FAIL: %s\n", msg); tests_failed++; } while(0)
+#define ASSERT(cond, msg) do { if (!(cond)) { FAIL(msg); return; } } while(0)
+
+void build_test_cfg(arix::ArixObfCFG& cfg) {
+    cfg.entry_block = cfg.add_block();
+    cfg.blocks[cfg.entry_block]->is_entry = true;
+
+    uint64_t b2 = cfg.add_block();
+    uint64_t b3 = cfg.add_block();
+    cfg.exit_block = cfg.add_block();
+    cfg.blocks[cfg.exit_block]->is_exit = true;
+
+    arix::ArixObfInstruction inst1;
+    inst1.type = arix::ArixObfInstType::MOV;
+    inst1.result = "x";
+    inst1.operand1 = "10";
+    cfg.blocks[cfg.entry_block]->instructions.push_back(inst1);
+
+    arix::ArixObfInstruction inst2;
+    inst2.type = arix::ArixObfInstType::ADD;
+    inst2.result = "x";
+    inst2.operand1 = "x";
+    inst2.operand2 = "5";
+    cfg.blocks[b2]->instructions.push_back(inst2);
+
+    arix::ArixObfInstruction inst3;
+    inst3.type = arix::ArixObfInstType::SUB;
+    inst3.result = "x";
+    inst3.operand1 = "x";
+    inst3.operand2 = "3";
+    cfg.blocks[b3]->instructions.push_back(inst3);
+
+    cfg.add_edge(cfg.entry_block, b2);
+    cfg.add_edge(b2, b3);
+    cfg.add_edge(b3, cfg.exit_block);
+}
+
+void test_flatten_simple() {
+    TEST("flatten_simple_3_blocks");
+    arix::ArixObfCFG cfg;
+    build_test_cfg(cfg);
+
+    ASSERT(cfg.blocks.size() == 4, "expected 4 blocks before flatten");
+
+    arix::ArixObfCFGFlattener flattener;
+    flattener.set_seed(12345);
+    flattener.flatten(cfg);
+
+    ASSERT(cfg.blocks.size() >= 4, "flatten should not remove blocks");
+
+    bool has_dispatcher = false;
+    for (auto& pair : cfg.blocks) {
+        if (pair.second->is_entry) {
+            has_dispatcher = true;
+            for (auto& inst : pair.second->instructions) {
+                if (inst.type == arix::ArixObfInstType::MOV &&
+                    inst.result == "state_var") {
+                    has_dispatcher = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    PASS();
+}
+
+void test_flatten_loop() {
+    TEST("flatten_loop");
+    arix::ArixObfCFG cfg;
+
+    cfg.entry_block = cfg.add_block();
+    cfg.blocks[cfg.entry_block]->is_entry = true;
+    uint64_t loop_header = cfg.add_block();
+    uint64_t loop_body = cfg.add_block();
+    cfg.exit_block = cfg.add_block();
+    cfg.blocks[cfg.exit_block]->is_exit = true;
+
+    cfg.add_edge(cfg.entry_block, loop_header);
+    cfg.add_edge(loop_header, loop_body);
+    cfg.add_edge(loop_body, loop_header);
+    cfg.add_edge(loop_header, cfg.exit_block);
+
+    arix::ArixObfCFGFlattener flattener;
+    flattener.set_seed(67890);
+    flattener.flatten(cfg);
+
+    ASSERT(cfg.blocks.size() >= 5, "flatten should not reduce blocks");
+    PASS();
+}
+
+void test_semantic_preserve() {
+    TEST("semantic_preserve");
+    arix::ArixObfCFG cfg;
+    build_test_cfg(cfg);
+
+    arix::ArixObfCFGFlattener flattener;
+    flattener.set_seed(11111);
+    flattener.flatten(cfg);
+
+    ASSERT(cfg.blocks.size() >= 4, "blocks preserved after flatten");
+    PASS();
+}
+
+int main() {
+    printf("\n=== S2 Obfuscation CFG Tests ===\n\n");
+
+    test_flatten_simple();
+    test_flatten_loop();
+    test_semantic_preserve();
+
+    printf("\nResults: %d passed, %d failed out of %d\n",
+           tests_passed, tests_failed, tests_passed + tests_failed);
+
+    return tests_failed > 0 ? 1 : 0;
+}

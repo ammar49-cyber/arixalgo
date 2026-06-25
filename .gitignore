@@ -10,3 +10,11 @@ src/python/arix_algo/Release/
 *.lib
 *.exp
 *.obj
+
+build_standalone/
+src/python/arix_algo/Debug/
+*.exe
+*.pdb
+*.dll
+*.ilk
+
