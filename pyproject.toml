@@ -9,13 +9,13 @@ description = "Next-generation AI architecture with security built into the foun
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "ARIX", email = "ammar@arix.dev"}
+    {name = "Ammar [ARIX]", email = "patches@arix.dev"}
 ]
 keywords = ["ai", "machine-learning", "neural-networks", "security"]
 
 [project.urls]
-Homepage = "https://algogit.com"
-Repository = "https://github.com/ARIX-Algo"
+Homepage = "https://github.com/ammar49-cyber/arixalgo"
+Repository = "https://github.com/ammar49-cyber/arixalgo.git"
 
 [tool.setuptools.packages.find]
 where = ["src/python"]

@@ -9,7 +9,7 @@ ARIX-Algo is a composable 5-component AI algorithm pipeline wrapped in 4 securit
 ### Build from source
 
 ```bash
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON

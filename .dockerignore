@@ -1,0 +1,15 @@
+build/
+.git/
+.gitattributes
+.gitignore
+.mailmap
+*.md
+docs/
+tests/
+benchmarks/
+examples/
+releases/
+*.tar.gz
+*.zip
+*.sig
+SUMS

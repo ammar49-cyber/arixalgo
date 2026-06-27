@@ -1,0 +1,19 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 80
+AllowShortFunctionsOnASingleLine: false
+BreakBeforeBraces: Attach
+PointerAlignment: Right
+SortIncludes: true
+IncludeBlocks: Regroup
+Standard: Cpp20
+AccessModifierOffset: -4
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: All
+UseTab: Never
+...

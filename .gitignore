@@ -1,31 +1,74 @@
+# Build artifacts
 build/
-__pycache__/
-*.pyc
-.vs/
-*.user
-*.suo
-.pytest_cache/
-*.pyd
-src/python/arix_algo/Release/
+build_standalone/
+out/
+dist/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CMakeUserPresets.json
+compile_commands.json
+
+# Object and library files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
 *.lib
 *.exp
 *.obj
-
-build_standalone/
-src/python/arix_algo/Debug/
-*.exe
 *.pdb
-*.dll
 *.ilk
+*.exe
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+src/python/arix_algo/Release/
+src/python/arix_algo/Debug/
 
-test_chacha_ref.py
-test_chacha_standalone.c
-test_qr.c
-CMakeLists_standalone.txt
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.log
+*.bak
+
+# Release artifacts
 releases/
 *.tar.gz
 *.zip
 *.sig
 SUMS
 
+# Standalone test files
+test_chacha_ref.py
+test_chacha_standalone.c
+test_qr.c
+CMakeLists_standalone.txt
+
+# DO NOT ignore security-sensitive files
+# *.key, *.pem, *.secret — should never be in repo; block via pre-commit

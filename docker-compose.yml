@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  build:
+    build:
+      context: .
+      target: builder
+    command: >
+      sh -c "cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON
+      && cmake --build . -j\"\$(nproc)\" && ctest --output-on-failure"
+    profiles:
+      - build
+
+  dev:
+    build:
+      context: .
+      target: builder
+    volumes:
+      - .:/src
+    working_dir: /src
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+    profiles:
+      - dev
+
+  fuzz:
+    build:
+      context: .
+      target: builder
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    command: >
+      sh -c "cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON
+      && cmake --build . -j\"\$(nproc)\" && ctest --repeat until-fail:100 --output-on-failure"
+    profiles:
+      - fuzz

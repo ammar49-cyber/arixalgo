@@ -1,0 +1,9 @@
+# BDFL ownership. No default reviewers.
+* @ammar49-cyber
+
+# Security-critical paths require BDFL review
+src/security/ @ammar49-cyber
+src/core/ @ammar49-cyber
+
+# Documentation review
+*.md @ammar49-cyber

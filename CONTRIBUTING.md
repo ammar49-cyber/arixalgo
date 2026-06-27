@@ -2,36 +2,39 @@
 
 ## Governance
 
-BDFL: Ammar [ARIX]
+BDFL: Ammar [ARIX] <patches@arix.dev>
 
 All decisions final. No voting. No committees.
 
 ## How to Contribute
 
-### 1. Email Patch
+### 1. Prepare Your Patch
 
 ```bash
 git format-patch -1 HEAD
-git send-email --to=patches@arix.dev 0001-your-patch.patch
 ```
 
-### 2. Wait for Review
+### 2. Email Your Patch
+
+Send to patches@arix.dev with subject prefix `[PATCH]`.
+
+### 3. Wait for Review
 
 Response time: 7 days typical, 30 days maximum.
 
-### 3. Address Feedback
+### 4. Address Feedback
 
-Amend commit. Resend.
+Amend your commit. Resend the updated patch.
 
 ## Patch Requirements
 
-- [ ] Signed-off-by line
-- [ ] GPG/Ed25519 signature
-- [ ] Passes all tests
-- [ ] No compiler warnings
-- [ ] Follows coding style
-- [ ] Includes tests for new code
-- [ ] Updates documentation
+- [ ] Signed-off-by line present
+- [ ] GPG or Ed25519 signature on commit
+- [ ] All tests pass: `ctest --output-on-failure`
+- [ ] No compiler warnings (use `-Wall -Wextra -Wpedantic`)
+- [ ] Follows coding style (see STYLEGUIDE.md)
+- [ ] Includes tests for new functionality
+- [ ] Updates documentation where relevant
 
 ## Coding Style
 
@@ -40,30 +43,34 @@ Amend commit. Resend.
 - 4 spaces, no tabs
 - snake_case for functions
 - PascalCase for structs
-- SCREAMING_SNAKE_CASE for macros
+- SCREAMING_SNAKE_CASE for macros and enums
 - 80 column limit
-- Braces on same line
+- Braces on same line (Attach style)
+- Pointer asterisk on the right: `int* p`
 
 ### C++
 
 - Google style with exceptions
-- snake_case for functions
+- snake_case for functions and variables
 - PascalCase for classes
-- Smart pointers mandatory
+- Smart pointers mandatory (unique_ptr, shared_ptr)
+- No exceptions in hot paths
+- RAII for resource management
 
 ### Python
 
 - PEP 8
-- Black formatter
-- Type hints required
+- Black formatter, 88 columns
+- Type hints required for all function signatures
+- Docstrings for public APIs
 
 ## Prohibited
 
-- GitHub pull requests
-- Discord/Slack discussions for technical decisions
-- Corporate CLAs
-- AI-generated code without human review
+- GitHub pull requests (email patches only)
+- Discord or Slack discussions for technical decisions
+- Corporate contributor license agreements (CLAs)
+- AI-generated code without explicit human understanding and review
 
 ## License
 
-By contributing, you agree to license your work under MIT.
+By contributing, you agree to license your work under the MIT License.
