@@ -6,7 +6,7 @@ Timeline: 6 phases, 6 days
 | Phase | Day | Focus | LOC Target | LOC Actual | Status |
 |-------|-----|-------|------------|------------|--------|
 | T0 | 1 | Audit & Foundation | 500 | 25 | Completed |
-| T1 | 2 | Creation & Shape | 500 | | Pending |
+| T1 | 2 | Creation & Shape | 500 | 542 | Completed |
 | T2 | 3 | Element-wise Ops | 500 | | Pending |
 | T3 | 4 | Reduction & LA | 500 | | Pending |
 | T4 | 5 | NN Ops | 500 | | Pending |

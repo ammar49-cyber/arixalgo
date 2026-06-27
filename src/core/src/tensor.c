@@ -38,7 +38,28 @@ static void* aligned_alloc_wrapper(size_t size, size_t alignment) {
     return arix_malloc(size, alignment);
 }
 
+static void arix_tensor_fill_scalar(ArixTensor* t, double value) {
+    unsigned char* data = (unsigned char*)t->data;
+    size_t n = t->size;
+    switch (t->dtype) {
+        case ARIX_FLOAT32: { float v = (float)value; for (size_t i = 0; i < n; i++) ((float*)data)[i] = v; break; }
+        case ARIX_FLOAT64: { double v = value; for (size_t i = 0; i < n; i++) ((double*)data)[i] = v; break; }
+        case ARIX_FLOAT16:
+        case ARIX_BFLOAT16:
+        case ARIX_FLOAT8:  { float v = (float)value; for (size_t i = 0; i < n; i++) ((float*)data)[i] = v; break; }
+        case ARIX_INT32:   { int32_t v = (int32_t)value; for (size_t i = 0; i < n; i++) ((int32_t*)data)[i] = v; break; }
+        case ARIX_INT64:   { int64_t v = (int64_t)value; for (size_t i = 0; i < n; i++) ((int64_t*)data)[i] = v; break; }
+        case ARIX_INT16:   { int16_t v = (int16_t)value; for (size_t i = 0; i < n; i++) ((int16_t*)data)[i] = v; break; }
+        case ARIX_INT8:    { int8_t v = (int8_t)value; for (size_t i = 0; i < n; i++) ((int8_t*)data)[i] = v; break; }
+        case ARIX_UINT8:   { uint8_t v = (uint8_t)value; for (size_t i = 0; i < n; i++) ((uint8_t*)data)[i] = v; break; }
+        case ARIX_BOOL:    { uint8_t v = value != 0.0 ? 1 : 0; for (size_t i = 0; i < n; i++) ((uint8_t*)data)[i] = v; break; }
+        case ARIX_COMPLEX64:
+        case ARIX_COMPLEX128: { memset(data, 0, n * t->item_size); break; }
+    }
+}
+
 ArixTensor* arix_tensor_create(const size_t* shape, size_t ndim, ArixDtype dtype) {
+    if (ndim > 0 && !shape) return NULL;
     ArixTensor* tensor = (ArixTensor*)aligned_alloc_wrapper(sizeof(ArixTensor), 64);
     if (!tensor) return NULL;
 
@@ -51,11 +72,12 @@ ArixTensor* arix_tensor_create(const size_t* shape, size_t ndim, ArixDtype dtype
     tensor->owns_data = 1;
     tensor->backend_handle = NULL;
 
-    tensor->shape = (size_t*)aligned_alloc_wrapper(ndim * sizeof(size_t), 64);
-    tensor->strides = (size_t*)aligned_alloc_wrapper(ndim * sizeof(size_t), 64);
+    size_t safe_ndim = ndim > 0 ? ndim : 1;
+    tensor->shape = (size_t*)aligned_alloc_wrapper(safe_ndim * sizeof(size_t), 64);
+    tensor->strides = (size_t*)aligned_alloc_wrapper(safe_ndim * sizeof(size_t), 64);
     if (!tensor->shape || !tensor->strides) {
-        arix_free(tensor->shape, ndim * sizeof(size_t));
-        arix_free(tensor->strides, ndim * sizeof(size_t));
+        arix_free(tensor->shape, safe_ndim * sizeof(size_t));
+        arix_free(tensor->strides, safe_ndim * sizeof(size_t));
         arix_free(tensor, sizeof(ArixTensor));
         return NULL;
     }
@@ -65,6 +87,7 @@ ArixTensor* arix_tensor_create(const size_t* shape, size_t ndim, ArixDtype dtype
         tensor->shape[i] = shape[i];
         total *= shape[i];
     }
+    if (ndim == 0) total = 1;
     tensor->size = total;
 
     size_t stride = 1;
@@ -206,8 +229,8 @@ ArixTensor* arix_tensor_full(const size_t* shape, size_t ndim, ArixDtype dtype, 
 
 ArixTensor* arix_tensor_arange(float start, float stop, float step, ArixDtype dtype) {
     if (step == 0.0f) return NULL;
+    if ((step > 0.0f && start >= stop) || (step < 0.0f && start <= stop)) return NULL;
     size_t n = (size_t)((stop - start) / step);
-    if ((stop - start) / step < 0) return NULL;
     size_t shape[] = {n};
     ArixTensor* tensor = arix_tensor_create(shape, 1, dtype);
     if (!tensor) return NULL;
@@ -247,9 +270,16 @@ ArixTensor* arix_tensor_eye(size_t n, ArixDtype dtype) {
     size_t shape[] = {n, n};
     ArixTensor* tensor = arix_tensor_zeros(shape, 2, dtype);
     if (!tensor) return NULL;
-    float* data = (float*)tensor->data;
+    unsigned char* data = (unsigned char*)tensor->data;
+    size_t is = tensor->item_size;
     for (size_t i = 0; i < n; i++) {
-        data[i * n + i] = 1.0f;
+        if (dtype == ARIX_FLOAT64) {
+            *(double*)(data + (i * n + i) * is) = 1.0;
+        } else if (dtype == ARIX_INT32 || dtype == ARIX_INT64) {
+            memset(data + (i * n + i) * is, 1, is);
+        } else {
+            *(float*)(data + (i * n + i) * is) = 1.0f;
+        }
     }
     return tensor;
 }
