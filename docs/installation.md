@@ -20,7 +20,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake git
 
 # Build
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON
@@ -59,7 +59,7 @@ sudo pacman -S gcc cmake git
 brew install cmake gcc
 
 # Build
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON
@@ -79,7 +79,7 @@ ctest --output-on-failure
 brew install cmake
 
 # Build (using Apple Clang; ARM NEON optimizations auto-detected)
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DARIX_BUILD_TESTS=ON
@@ -98,7 +98,7 @@ ctest --output-on-failure
 # CMake 3.16+ (included with VS 2022)
 
 # Open "Developer Command Prompt for VS 2022"
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build
 cd build

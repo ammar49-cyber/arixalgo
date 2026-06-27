@@ -9,7 +9,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor agreement, pa
 ### Setup
 
 ```bash
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 mkdir build && cd build
 

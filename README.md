@@ -208,7 +208,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 
 ```bash
 # Clone 🧬
-git clone https://github.com/ARIX-Algo/arix-algo.git
+git clone https://github.com/ammar49-cyber/arixalgo.git
 cd arix-algo
 
 # Configure 🔧
@@ -576,7 +576,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on:
 
 <p align="center">
   <a href="https://aixsite.vercel.app"><b>🌐 Website</b></a> ·
-  <a href="https://github.com/ARIX-Algo"><b>🐙 GitHub</b></a> ·
+  <a href="https://github.com/ammar49-cyber/arixalgo"><b>🐙 GitHub</b></a> ·
   <a href="https://x.com/Arixdrv"><b>🐦 Twitter / X</b></a> ·
   <a href="https://www.instagram.com/algoarix/"><b>📸 Instagram</b></a> ·
   <a href="https://www.youtube.com/@ArixAlgo"><b>🎬 YouTube</b></a>
@@ -590,7 +590,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on:
 @software{arix_algo_2026,
   author = {Ammar [ARIX]},
   title = {{ARIX-Algo}: Next-generation {AI} architecture with cryptographic integrity},
-  url = {https://github.com/ARIX-Algo},
+  url = {https://github.com/ammar49-cyber/arixalgo},
   year = {2026}
 }
 ```
