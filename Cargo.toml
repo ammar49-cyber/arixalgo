@@ -2,7 +2,7 @@
 name = "arix-distributed"
 version = "0.1.0"
 edition = "2021"
-authors = ["Ammar [ARIX] <patches@arix.dev>"]
+authors = ["Ammar [ARIX] <algoarix@gmail.com>"]
 description = "Distributed training and networking for ARIX-Algo"
 license = "MIT"
 

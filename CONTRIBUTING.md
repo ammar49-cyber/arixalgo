@@ -2,7 +2,7 @@
 
 ## Governance
 
-BDFL: Ammar [ARIX] <patches@arix.dev>
+BDFL: Ammar [ARIX] <algoarix@gmail.com>
 
 All decisions final. No voting. No committees.
 
@@ -16,7 +16,7 @@ git format-patch -1 HEAD
 
 ### 2. Email Your Patch
 
-Send to patches@arix.dev with subject prefix `[PATCH]`.
+Send to algoarix@gmail.com with subject prefix `[PATCH]`.
 
 ### 3. Wait for Review
 

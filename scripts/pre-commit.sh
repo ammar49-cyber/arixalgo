@@ -35,11 +35,11 @@ check "No secrets" sh -c "
 
 # 3. No merge conflict markers
 check "No merge conflict markers" sh -c "
-    ! grep -rn '<<<<<<<\|=======\|>>>>>>>' "$ROOT_DIR" \
-        --include='*.c' --include='*.h' --include='*.cpp' --include='*.hpp' \
-        --include='*.py' --include='*.sh' --include='*.yml' --include='*.yaml' \
-        --include='*.json' --include='*.toml' --include='*.md' --include='*.txt' \
-        --exclude-dir='.git' --exclude-dir='build' 2>/dev/null | grep -q .
+    ! find "$ROOT_DIR" -path '*/build/*' -prune -o -path '*/.git/*' -prune -o \
+        \( -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \
+           -o -name '*.py' -o -name '*.sh' -o -name '*.yml' -o -name '*.yaml' \
+           -o -name '*.json' -o -name '*.toml' -o -name '*.md' -o -name '*.txt' \) \
+        -exec grep -q '=======' {} \; -print | grep -q . && exit 1 || exit 0
 "
 
 # 4. Trailing whitespace

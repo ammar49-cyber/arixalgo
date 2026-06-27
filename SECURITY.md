@@ -12,7 +12,7 @@
 
 Report security vulnerabilities privately. Do NOT open public issues.
 
-Email: security@arix.dev
+Email: algoarix@gmail.com
 
 GPG key: Available from S0 key infrastructure (Ed25519).
 

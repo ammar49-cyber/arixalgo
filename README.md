@@ -546,7 +546,7 @@ We accept email patches. No pull requests. No Discord. **Technical merit above a
 
 ```bash
 git format-patch -1 HEAD
-git send-email --to=patches@arix.dev 0001-your-patch.patch
+git send-email --to=algoarix@gmail.com 0001-your-patch.patch
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on:
@@ -566,9 +566,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on:
 
 | Purpose | Contact |
 |---------|---------|
-| 📝 Patches | [patches@arix.dev](mailto:patches@arix.dev) |
-| 🔐 Security | [security@arix.dev](mailto:security@arix.dev) |
-| ⚖️ Conduct | [conduct@arix.dev](mailto:conduct@arix.dev) |
+| 📝 Patches | [algoarix@gmail.com](mailto:algoarix@gmail.com) |
+| 🔐 Security | [algoarix@gmail.com](mailto:algoarix@gmail.com) |
+| ⚖️ Conduct | [algoarix@gmail.com](mailto:algoarix@gmail.com) |
 
 ---
 

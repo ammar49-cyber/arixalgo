@@ -4,7 +4,7 @@ ARIX-Algo is a BDFL (Benevolent Dictator For Life) project.
 
 ## BDFL
 
-Ammar [ARIX] <patches@arix.dev>
+Ammar [ARIX] <algoarix@gmail.com>
 
 ## Powers
 

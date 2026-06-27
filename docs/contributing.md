@@ -105,9 +105,9 @@ cmake --preset asan
 
 ## Communication
 
-- **Patches**: patches@arix.dev
-- **Security**: security@arix.dev
-- **Conduct**: conduct@arix.dev
+- **Patches**: algoarix@gmail.com
+- **Security**: algoarix@gmail.com
+- **Conduct**: algoarix@gmail.com
 - **No**: GitHub issues, Discord, Slack
 
 ## Code Review

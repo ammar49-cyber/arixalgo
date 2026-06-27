@@ -9,7 +9,7 @@ description = "Next-generation AI architecture with security built into the foun
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Ammar [ARIX]", email = "patches@arix.dev"}
+    {name = "Ammar [ARIX]", email = "algoarix@gmail.com"}
 ]
 keywords = ["ai", "machine-learning", "neural-networks", "security"]
 

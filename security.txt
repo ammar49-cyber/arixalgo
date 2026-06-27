@@ -1,5 +1,5 @@
 -----BEGIN SECURITY CONTACT-----
-Contact: mailto:security@arix.dev
+Contact: mailto:algoarix@gmail.com
 Expires: 2027-06-24T00:00:00Z
 Acknowledgments: https://github.com/ammar49-cyber/arixalgo/blob/main/SECURITY.md
 Policy: https://github.com/ammar49-cyber/arixalgo/blob/main/SECURITY.md

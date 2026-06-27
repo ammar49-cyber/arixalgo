@@ -25,7 +25,7 @@ All decisions are final. No appeals.
 
 ## Reporting
 
-Report violations to conduct@arix.dev.
+Report violations to algoarix@gmail.com.
 
 All reports will be reviewed by the BDFL and will remain confidential.
 

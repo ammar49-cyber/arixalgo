@@ -31,5 +31,5 @@ What actually happens. Include error messages, stack traces, or test failures.
 ## Additional Context
 Logs, screenshots, or relevant test output.
 
-> **Security issues**: Do NOT open public issues for security vulnerabilities. Email security@arix.dev.
+> **Security issues**: Do NOT open public issues for security vulnerabilities. Email algoarix@gmail.com.
 > **BDFL governance**: This project uses BDFL governance. Issues are tracked but not voted on.

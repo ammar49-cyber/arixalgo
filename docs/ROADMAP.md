@@ -251,4 +251,4 @@ Now ─────────────────────────�
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) and [docs/contributing.md](contributing.md). All contributions are cryptographically signed and verified.
 
-Pick a milestone from v0.5.0 or S3-S7 above. Submit patches via email to patches@arix.dev.
+Pick a milestone from v0.5.0 or S3-S7 above. Submit patches via email to algoarix@gmail.com.
