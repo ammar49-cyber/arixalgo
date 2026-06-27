@@ -115,6 +115,8 @@ static void backward_nop(void* ctx, ArixTensor* grad_output) {
 }
 
 typedef struct { ArixVariable *a, *b; } BinopCtx;
+typedef struct { ArixVariable *a, *b; ArixTensor* result; } PowCtx;
+typedef struct { ArixVariable* a; } UnaryCtx;
 
 static void backward_add(void* ctx, ArixTensor* grad_output) {
     BinopCtx* c = (BinopCtx*)ctx;
@@ -141,6 +143,83 @@ static void backward_mul(void* ctx, ArixTensor* grad_output) {
         ArixTensor* g = arix_tensor_mul(grad_output, c->a->data);
         reduce_grad_to_shape(&g, c->b->data);
         grad_accum(&c->b->grad, g);
+    }
+}
+
+static void backward_sub(void* ctx, ArixTensor* grad_output) {
+    BinopCtx* c = (BinopCtx*)ctx;
+    if (c->a->requires_grad) {
+        ArixTensor* g = arix_tensor_copy(grad_output);
+        reduce_grad_to_shape(&g, c->a->data);
+        grad_accum(&c->a->grad, g);
+    }
+    if (c->b->requires_grad) {
+        ArixTensor* g = arix_tensor_neg(grad_output);
+        reduce_grad_to_shape(&g, c->b->data);
+        grad_accum(&c->b->grad, g);
+    }
+}
+
+static void backward_div(void* ctx, ArixTensor* grad_output) {
+    BinopCtx* c = (BinopCtx*)ctx;
+    if (!c->b->data) return;
+    if (c->a->requires_grad) {
+        ArixTensor* g = arix_tensor_div(grad_output, c->b->data);
+        reduce_grad_to_shape(&g, c->a->data);
+        grad_accum(&c->a->grad, g);
+    }
+    if (c->b->requires_grad) {
+        ArixTensor* b_sq = arix_tensor_mul(c->b->data, c->b->data);
+        ArixTensor* a_div_b_sq = arix_tensor_div(c->a->data, b_sq);
+        ArixTensor* neg_adbsq = arix_tensor_neg(a_div_b_sq);
+        ArixTensor* g = arix_tensor_mul(grad_output, neg_adbsq);
+        arix_tensor_destroy(b_sq);
+        arix_tensor_destroy(a_div_b_sq);
+        arix_tensor_destroy(neg_adbsq);
+        reduce_grad_to_shape(&g, c->b->data);
+        grad_accum(&c->b->grad, g);
+    }
+}
+
+static void backward_neg(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (c->a->requires_grad) {
+        ArixTensor* g = arix_tensor_neg(grad_output);
+        grad_accum(&c->a->grad, g);
+    }
+}
+
+static void backward_pow(void* ctx, ArixTensor* grad_output) {
+    PowCtx* c = (PowCtx*)ctx;
+    if (!c->a->data || !c->b->data) return;
+    if (c->a->requires_grad) {
+        ArixTensor* b_minus_1 = NULL;
+        if (c->b->data->size == 1) {
+            b_minus_1 = arix_tensor_copy(c->b->data);
+            float bv = ((float*)b_minus_1->data)[0];
+            ((float*)b_minus_1->data)[0] = bv - 1.0f;
+        } else {
+            ArixTensor* ones = arix_tensor_ones(c->b->data->shape, c->b->data->ndim, ARIX_FLOAT32);
+            b_minus_1 = arix_tensor_sub(c->b->data, ones);
+            arix_tensor_destroy(ones);
+        }
+        ArixTensor* a_pow_bm1 = arix_tensor_pow(c->a->data, b_minus_1);
+        ArixTensor* da = arix_tensor_mul(c->b->data, a_pow_bm1);
+        ArixTensor* ga = arix_tensor_mul(grad_output, da);
+        arix_tensor_destroy(b_minus_1);
+        arix_tensor_destroy(a_pow_bm1);
+        arix_tensor_destroy(da);
+        reduce_grad_to_shape(&ga, c->a->data);
+        grad_accum(&c->a->grad, ga);
+    }
+    if (c->b->requires_grad && c->result) {
+        ArixTensor* log_a = arix_tensor_log(c->a->data);
+        ArixTensor* db = arix_tensor_mul(c->result, log_a);
+        ArixTensor* gb = arix_tensor_mul(grad_output, db);
+        arix_tensor_destroy(log_a);
+        arix_tensor_destroy(db);
+        reduce_grad_to_shape(&gb, c->b->data);
+        grad_accum(&c->b->grad, gb);
     }
 }
 
@@ -187,8 +266,6 @@ static void backward_mse(void* ctx, ArixTensor* grad_output) {
         grad_accum(&c->pred->grad, diff);
     }
 }
-
-typedef struct { ArixVariable* a; } UnaryCtx;
 
 static void backward_relu(void* ctx, ArixTensor* grad_output) {
     UnaryCtx* c = (UnaryCtx*)ctx;
@@ -551,7 +628,20 @@ ArixVariable* arix_add(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
 }
 
 ArixVariable* arix_sub(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
-    return op_binary(tape, a, b, arix_tensor_sub, NULL, NULL, 0);
+    int rg = requires_grad(a, b);
+    if (!a || !b || !a->data || !b->data) return NULL;
+    ArixTensor* result = arix_tensor_sub(a->data, b->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        BinopCtx* ctx = (BinopCtx*)arix_malloc(sizeof(BinopCtx), 64);
+        if (ctx) { ctx->a = a; ctx->b = b; var->backward_fn = backward_sub; var->backward_ctx = ctx; }
+        ArixVariable* pars[2]; pars[0] = a; pars[1] = b;
+        set_parents(var, pars, 2);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
 }
 
 ArixVariable* arix_mul(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
@@ -572,15 +662,58 @@ ArixVariable* arix_mul(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
 }
 
 ArixVariable* arix_div(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
-    return op_binary(tape, a, b, arix_tensor_div, NULL, NULL, 0);
+    int rg = requires_grad(a, b);
+    if (!a || !b || !a->data || !b->data) return NULL;
+    ArixTensor* result = arix_tensor_div(a->data, b->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        BinopCtx* ctx = (BinopCtx*)arix_malloc(sizeof(BinopCtx), 64);
+        if (ctx) { ctx->a = a; ctx->b = b; var->backward_fn = backward_div; var->backward_ctx = ctx; }
+        ArixVariable* pars[2]; pars[0] = a; pars[1] = b;
+        set_parents(var, pars, 2);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
 }
 
 ArixVariable* arix_pow(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
-    return op_binary(tape, a, b, arix_tensor_pow, NULL, NULL, 0);
+    int rg = requires_grad(a, b);
+    if (!a || !b || !a->data || !b->data) return NULL;
+    ArixTensor* result = arix_tensor_pow(a->data, b->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        PowCtx* ctx = (PowCtx*)arix_malloc(sizeof(PowCtx), 64);
+        if (ctx) {
+            ctx->a = a; ctx->b = b;
+            ctx->result = arix_tensor_copy(result);
+            var->backward_fn = backward_pow;
+            var->backward_ctx = ctx;
+        }
+        ArixVariable* pars[2]; pars[0] = a; pars[1] = b;
+        set_parents(var, pars, 2);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
 }
 
 ArixVariable* arix_neg(ArixTape* tape, ArixVariable* a) {
-    return op_unary(tape, a, arix_tensor_neg, NULL);
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_neg(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_neg; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
 }
 
 ArixVariable* arix_matmul(ArixTape* tape, ArixVariable* a, ArixVariable* b) {
@@ -838,15 +971,15 @@ typedef struct { ArixVariable** vars; size_t num_vars; size_t dim; size_t* split
 static void backward_concat(void* ctx, ArixTensor* grad_output) {
     ConcatCtx* c = (ConcatCtx*)ctx;
     if (!c || !grad_output) return;
-    size_t offset = 0;
+    size_t element_offset = 0;
     size_t slice_size = grad_output->size / grad_output->shape[c->dim];
     for (size_t i = 0; i < c->num_vars; i++) {
-        size_t n = c->splits[i] * slice_size;
-        ArixTensor* slice = arix_tensor_slice(grad_output, c->dim, offset, offset + n / slice_size);
+        size_t start = element_offset / slice_size;
+        ArixTensor* slice = arix_tensor_slice(grad_output, c->dim, start, start + c->splits[i]);
         if (slice) {
             grad_accum(&c->vars[i]->grad, slice);
         }
-        offset += n;
+        element_offset += c->splits[i] * slice_size;
     }
 }
 

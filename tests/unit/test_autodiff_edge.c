@@ -150,6 +150,48 @@ static void test_sigmoid_null(void) {
     arix_tape_destroy(tape);
 }
 
+static void test_silu_null(void) {
+    ArixTape* tape = arix_tape_create();
+    ArixVariable* c = arix_silu(tape, NULL);
+    ASSERT_NULL(c, "silu NULL");
+    arix_tape_destroy(tape);
+}
+
+static void test_div_null(void) {
+    size_t sh[] = {3};
+    ArixTensor* ta = arix_tensor_ones(sh, 1, ARIX_FLOAT32);
+    ArixVariable* a = arix_variable_create(ta, 1);
+    ArixTape* tape = arix_tape_create();
+    ArixVariable* c = arix_div(tape, a, NULL);
+    ASSERT_NULL(c, "div NULL b");
+    c = arix_div(tape, NULL, a);
+    ASSERT_NULL(c, "div NULL a");
+    arix_tape_destroy(tape);
+    a->data = NULL;
+    arix_variable_destroy(a);
+}
+
+static void test_pow_null(void) {
+    size_t sh[] = {3};
+    ArixTensor* ta = arix_tensor_ones(sh, 1, ARIX_FLOAT32);
+    ArixVariable* a = arix_variable_create(ta, 1);
+    ArixTape* tape = arix_tape_create();
+    ArixVariable* c = arix_pow(tape, a, NULL);
+    ASSERT_NULL(c, "pow NULL b");
+    c = arix_pow(tape, NULL, a);
+    ASSERT_NULL(c, "pow NULL a");
+    arix_tape_destroy(tape);
+    a->data = NULL;
+    arix_variable_destroy(a);
+}
+
+static void test_neg_null(void) {
+    ArixTape* tape = arix_tape_create();
+    ArixVariable* c = arix_neg(tape, NULL);
+    ASSERT_NULL(c, "neg NULL");
+    arix_tape_destroy(tape);
+}
+
 static void test_tanh_null(void) {
     ArixTape* tape = arix_tape_create();
     ArixVariable* c = arix_tanh(tape, NULL);
@@ -302,6 +344,10 @@ int main(void) {
     run_test("dropout null", test_dropout_null);
     run_test("layer_norm null", test_layer_norm_null);
     run_test("concat null", test_concat_null);
+    run_test("silu null", test_silu_null);
+    run_test("div null", test_div_null);
+    run_test("pow null", test_pow_null);
+    run_test("neg null", test_neg_null);
     run_test("tape backward constant", test_tape_backward_constant);
     run_test("tape record null", test_tape_record_null);
     run_test("no_grad scoping", test_no_grad_scoping);
