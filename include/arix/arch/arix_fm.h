@@ -73,4 +73,31 @@ ArixTensor* arix_fm_compress_gradients(const ArixTensor* gradients, float ratio)
 void arix_fm_add_privacy_noise(ArixTensor* data, float epsilon);
 int arix_fm_forward(ArixFMController* ctrl, size_t node_id, const ArixTensor* input, ArixTensor** output);
 
+// ── Error-compensated gradient compression (EF-SGD) ──────────────────────────
+
+typedef struct {
+    ArixTensor* error_buffer;
+    ArixTensor* compressed_grad;
+    float compression_ratio;
+    size_t dim;
+} ArixFMErrorFeedback;
+
+ArixFMErrorFeedback* arix_fm_error_feedback_create(size_t dim, float ratio);
+void arix_fm_error_feedback_destroy(ArixFMErrorFeedback* ef);
+ArixTensor* arix_fm_compress_with_error(ArixFMErrorFeedback* ef, const ArixTensor* gradient);
+
+// ── Exponential moving average (catastrophic forgetting) ─────────────────────
+
+void arix_fm_ewm_update(ArixFMMemoryBank* bank, float alpha);
+
+// ── Adaptive sync frequency ──────────────────────────────────────────────────
+
+float arix_fm_compute_change_rate(ArixFMMemoryBank* bank, const ArixTensor* new_values);
+size_t arix_fm_adaptive_sync_interval(ArixFMController* ctrl, float base_interval);
+
+// ── Gradient send / receive ──────────────────────────────────────────────────
+
+int arix_fm_send_gradients(ArixFMController* ctrl, size_t node_id, const ArixTensor* gradients);
+int arix_fm_receive_gradients(ArixFMController* ctrl, size_t node_id, ArixTensor* aggregated);
+
 #endif /* ARIX_FM_H */

@@ -88,4 +88,22 @@ ArixNPEProgram* arix_npe_compile_attention(size_t seq_len, size_t dim);
 ArixNPEProgram* arix_npe_compile_mlp(size_t dim, size_t hidden_dim);
 int arix_npe_verify_program(const ArixNPEProgram* prog, char** error_msg, size_t* error_len);
 
+// JIT profiling data
+typedef struct ArixNPEJITProfile {
+    size_t op_frequency[32];
+    size_t op_latency[32];
+    size_t total_instructions;
+    size_t hot_threshold;
+    int   is_profiling;
+} ArixNPEJITProfile;
+
+ArixNPEJITProfile* arix_npe_jit_profile_create(size_t hot_threshold);
+void arix_npe_jit_profile_destroy(ArixNPEJITProfile* profile);
+void arix_npe_jit_record(ArixNPEJITProfile* profile, int opcode, float latency_us);
+ArixNPEProgram* arix_npe_jit_compile(ArixNPEJITProfile* profile, const ArixNPEProgram* original);
+ArixNPEProgram* arix_npe_jit_specialize(const ArixNPEProgram* prog, size_t batch, size_t seq_len, size_t dim);
+ArixNPEProgram* arix_npe_jit_fuse(const ArixNPEProgram* prog);
+ArixNPEProgram* arix_npe_jit_constant_fold(const ArixNPEProgram* prog, const ArixTensor* memory);
+ArixNPEProgram* arix_npe_jit_dce(const ArixNPEProgram* prog);
+
 #endif /* ARIX_NPE_H */

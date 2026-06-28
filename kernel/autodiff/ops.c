@@ -1037,3 +1037,569 @@ ArixVariable* arix_conv2d(ArixTape* tape, ArixVariable* input, ArixVariable* ker
     if (tape && g_grad_enabled) arix_tape_record(tape, var);
     return var;
 }
+
+/* ===== sqrt ===== */
+static void backward_sqrt(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) {
+        float sx = sqrtf(fabsf(xd[i])) + 1e-8f;
+        gd[i] = go[i] * (0.5f / sx);
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_sqrt(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_sqrt(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_sqrt; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== abs ===== */
+static void backward_abs(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) {
+        gd[i] = go[i] * (xd[i] > 0.0f ? 1.0f : (xd[i] < 0.0f ? -1.0f : 0.0f));
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_abs(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_abs(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_abs; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== sin ===== */
+static void backward_sin(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) gd[i] = go[i] * cosf(xd[i]);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_sin(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_sin(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_sin; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== cos ===== */
+static void backward_cos(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) gd[i] = -go[i] * sinf(xd[i]);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_cos(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_cos(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_cos; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== tan ===== */
+static void backward_tan(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) {
+        float t = tanf(xd[i]);
+        gd[i] = go[i] * (1.0f + t * t);
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_tan(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_tan(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_tan; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== asin ===== */
+static void backward_asin(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) {
+        float denom = sqrtf(1.0f - xd[i] * xd[i]) + 1e-8f;
+        gd[i] = go[i] / denom;
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_asin(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_asin(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_asin; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== acos ===== */
+static void backward_acos(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) {
+        float denom = sqrtf(1.0f - xd[i] * xd[i]) + 1e-8f;
+        gd[i] = -go[i] / denom;
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_acos(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_acos(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_acos; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== atan ===== */
+static void backward_atan(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) gd[i] = go[i] / (1.0f + xd[i] * xd[i]);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_atan(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_atan(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_atan; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== sinh ===== */
+static void backward_sinh(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) gd[i] = go[i] * coshf(xd[i]);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_sinh(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_sinh(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_sinh; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== cosh ===== */
+static void backward_cosh(void* ctx, ArixTensor* grad_output) {
+    UnaryCtx* c = (UnaryCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t n = c->a->data->size;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t i = 0; i < n; i++) gd[i] = go[i] * sinhf(xd[i]);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_cosh(ArixTape* tape, ArixVariable* a) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_cosh(a->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        UnaryCtx* ctx = (UnaryCtx*)arix_malloc(sizeof(UnaryCtx), 64);
+        if (ctx) { ctx->a = a; var->backward_fn = backward_cosh; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== var ===== */
+static void backward_var(void* ctx, ArixTensor* grad_output) {
+    DimCtx* c = (DimCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t outer = 1, inner = 1;
+    for (size_t i = 0; i < c->dim; i++) outer *= c->a->data->shape[i];
+    size_t dim_size = c->a->data->shape[c->dim];
+    for (size_t i = c->dim + 1; i < c->a->data->ndim; i++) inner *= c->a->data->shape[i];
+    float n_1 = (float)(dim_size > 1 ? dim_size - 1 : 1);
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t o = 0; o < outer; o++) {
+        for (size_t i = 0; i < inner; i++) {
+            float mean = 0.0f;
+            for (size_t d = 0; d < dim_size; d++) mean += xd[o * dim_size * inner + d * inner + i];
+            mean /= (float)dim_size;
+            float gv = go[o * inner + i];
+            for (size_t d = 0; d < dim_size; d++) {
+                size_t idx = o * dim_size * inner + d * inner + i;
+                gd[idx] = 2.0f * (xd[idx] - mean) * gv / n_1;
+            }
+        }
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_var(ArixTape* tape, ArixVariable* a, size_t dim) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_var(a->data, dim);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        DimCtx* ctx = (DimCtx*)arix_malloc(sizeof(DimCtx), 64);
+        if (ctx) { ctx->a = a; ctx->dim = dim; var->backward_fn = backward_var; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== std ===== */
+static void backward_std(void* ctx, ArixTensor* grad_output) {
+    DimCtx* c = (DimCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    float* xd = (float*)c->a->data->data;
+    float* go = (float*)grad_output->data;
+    size_t outer = 1, inner = 1;
+    for (size_t i = 0; i < c->dim; i++) outer *= c->a->data->shape[i];
+    size_t dim_size = c->a->data->shape[c->dim];
+    for (size_t i = c->dim + 1; i < c->a->data->ndim; i++) inner *= c->a->data->shape[i];
+    float n_1 = (float)(dim_size > 1 ? dim_size - 1 : 1);
+    float eps = 1e-8f;
+    ArixTensor* g = arix_tensor_zeros(c->a->data->shape, c->a->data->ndim, ARIX_FLOAT32);
+    float* gd = (float*)g->data;
+    for (size_t o = 0; o < outer; o++) {
+        for (size_t i = 0; i < inner; i++) {
+            float mean = 0.0f;
+            for (size_t d = 0; d < dim_size; d++) mean += xd[o * dim_size * inner + d * inner + i];
+            mean /= (float)dim_size;
+            float var = 0.0f;
+            for (size_t d = 0; d < dim_size; d++) {
+                float diff = xd[o * dim_size * inner + d * inner + i] - mean;
+                var += diff * diff;
+            }
+            var /= (float)dim_size;
+            float std_val = sqrtf(var + eps);
+            float gv = go[o * inner + i];
+            for (size_t d = 0; d < dim_size; d++) {
+                size_t idx = o * dim_size * inner + d * inner + i;
+                gd[idx] = (xd[idx] - mean) * gv / (n_1 * std_val);
+            }
+        }
+    }
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_std(ArixTape* tape, ArixVariable* a, size_t dim) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_std(a->data, dim);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        DimCtx* ctx = (DimCtx*)arix_malloc(sizeof(DimCtx), 64);
+        if (ctx) { ctx->a = a; ctx->dim = dim; var->backward_fn = backward_std; var->backward_ctx = ctx; }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== cross_entropy ===== */
+typedef struct { ArixVariable* pred; ArixVariable* target; size_t N; size_t num_classes; } CrossEntropyCtx;
+
+static void backward_cross_entropy(void* ctx, ArixTensor* grad_output) {
+    CrossEntropyCtx* c = (CrossEntropyCtx*)ctx;
+    (void)grad_output;
+    if (c->pred->requires_grad) {
+        ArixTensor* sm = arix_tensor_softmax(c->pred->data, 1);
+        float* sd = (float*)sm->data;
+        float* td = (float*)c->target->data;
+        size_t n = c->target->data->size;
+        size_t nc = c->num_classes;
+        float scale = 1.0f / (float)c->N;
+        ArixTensor* g = arix_tensor_zeros(c->pred->data->shape, c->pred->data->ndim, ARIX_FLOAT32);
+        float* gd = (float*)g->data;
+        for (size_t i = 0; i < n; i++) {
+            int t = (int)td[i];
+            for (size_t j = 0; j < nc; j++) {
+                float indicator = (j == (size_t)t) ? 1.0f : 0.0f;
+                gd[i * nc + j] = (sd[i * nc + j] - indicator) * scale;
+            }
+        }
+        arix_tensor_destroy(sm);
+        grad_accum(&c->pred->grad, g);
+    }
+}
+
+ArixVariable* arix_cross_entropy(ArixTape* tape, ArixVariable* pred, ArixVariable* target) {
+    if (!pred || !target || !pred->data || !target->data) return NULL;
+    ArixTensor* result = arix_tensor_cross_entropy(pred->data, target->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, 0);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    int rg = requires_grad(pred, target);
+    if (rg && g_grad_enabled) {
+        CrossEntropyCtx* ctx = (CrossEntropyCtx*)arix_malloc(sizeof(CrossEntropyCtx), 64);
+        if (ctx) {
+            ctx->pred = pred; ctx->target = target;
+            ctx->N = pred->data->size / pred->data->shape[1];
+            ctx->num_classes = pred->data->shape[1];
+            var->backward_fn = backward_cross_entropy; var->backward_ctx = ctx;
+        }
+        set_parents(var, &pred, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== nll_loss ===== */
+typedef struct { ArixVariable* pred; ArixVariable* target; size_t N; } NLLCtx;
+
+static void backward_nll(void* ctx, ArixTensor* grad_output) {
+    NLLCtx* c = (NLLCtx*)ctx;
+    (void)grad_output;
+    if (c->pred->requires_grad) {
+        float* pd = (float*)c->pred->data->data;
+        float* td = (float*)c->target->data;
+        size_t n = c->target->data->size;
+        size_t nc = c->pred->data->size / n;
+        ArixTensor* g = arix_tensor_zeros(c->pred->data->shape, c->pred->data->ndim, ARIX_FLOAT32);
+        float* gd = (float*)g->data;
+        for (size_t i = 0; i < n; i++) {
+            int t = (int)td[i];
+            size_t idx = i * nc + (size_t)t;
+            gd[idx] = -1.0f / (pd[idx] + 1e-8f);
+        }
+        grad_accum(&c->pred->grad, g);
+    }
+}
+
+ArixVariable* arix_nll_loss(ArixTape* tape, ArixVariable* pred, ArixVariable* target) {
+    if (!pred || !target || !pred->data || !target->data) return NULL;
+    ArixTensor* result = arix_tensor_nll_loss(pred->data, target->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, 0);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    int rg = requires_grad(pred, target);
+    if (rg && g_grad_enabled) {
+        NLLCtx* ctx = (NLLCtx*)arix_malloc(sizeof(NLLCtx), 64);
+        if (ctx) {
+            ctx->pred = pred; ctx->target = target; ctx->N = target->data->size;
+            var->backward_fn = backward_nll; var->backward_ctx = ctx;
+        }
+        set_parents(var, &pred, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== bce_loss ===== */
+typedef struct { ArixVariable* pred; ArixVariable* target; } BCECtx;
+
+static void backward_bce(void* ctx, ArixTensor* grad_output) {
+    BCECtx* c = (BCECtx*)ctx;
+    if (c->pred->requires_grad) {
+        float* pd = (float*)c->pred->data->data;
+        float* td = (float*)c->target->data->data;
+        float* go = (float*)grad_output->data;
+        size_t n = c->pred->data->size;
+        ArixTensor* g = arix_tensor_zeros(c->pred->data->shape, c->pred->data->ndim, ARIX_FLOAT32);
+        float* gd = (float*)g->data;
+        for (size_t i = 0; i < n; i++) {
+            float p = pd[i];
+            float denom = p * (1.0f - p) + 1e-8f;
+            gd[i] = go[i] * (p - td[i]) / denom;
+        }
+        grad_accum(&c->pred->grad, g);
+    }
+}
+
+ArixVariable* arix_bce_loss(ArixTape* tape, ArixVariable* pred, ArixVariable* target) {
+    if (!pred || !target || !pred->data || !target->data) return NULL;
+    ArixTensor* result = arix_tensor_binary_cross_entropy(pred->data, target->data);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, 0);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    int rg = requires_grad(pred, target);
+    if (rg && g_grad_enabled) {
+        BCECtx* ctx = (BCECtx*)arix_malloc(sizeof(BCECtx), 64);
+        if (ctx) { ctx->pred = pred; ctx->target = target; var->backward_fn = backward_bce; var->backward_ctx = ctx; }
+        set_parents(var, &pred, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
+/* ===== embedding ===== */
+typedef struct { ArixVariable* weight; ArixVariable* indices; } EmbeddingCtx;
+
+static void backward_embedding(void* ctx, ArixTensor* grad_output) {
+    EmbeddingCtx* c = (EmbeddingCtx*)ctx;
+    if (c->weight->requires_grad) {
+        size_t vocab_size = c->weight->data->shape[0];
+        size_t embed_dim = c->weight->data->shape[1];
+        float* go = (float*)grad_output->data;
+        int32_t* idx = (int32_t*)c->indices->data->data;
+        size_t num_indices = c->indices->data->size;
+        ArixTensor* g = arix_tensor_zeros(c->weight->data->shape, c->weight->data->ndim, ARIX_FLOAT32);
+        float* gd = (float*)g->data;
+        for (size_t i = 0; i < num_indices; i++) {
+            int32_t ix = idx[i];
+            if (ix >= 0 && (size_t)ix < vocab_size) {
+                for (size_t d = 0; d < embed_dim; d++)
+                    gd[(size_t)ix * embed_dim + d] += go[i * embed_dim + d];
+            }
+        }
+        grad_accum(&c->weight->grad, g);
+    }
+}
+
+ArixVariable* arix_embedding(ArixTape* tape, ArixVariable* weight, ArixVariable* indices) {
+    if (!weight || !indices || !weight->data || !indices->data) return NULL;
+    ArixTensor* result = arix_tensor_embedding(weight->data, indices->data);
+    if (!result) return NULL;
+    int rg = requires_grad(weight, NULL);
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        EmbeddingCtx* ctx = (EmbeddingCtx*)arix_malloc(sizeof(EmbeddingCtx), 64);
+        if (ctx) { ctx->weight = weight; ctx->indices = indices; var->backward_fn = backward_embedding; var->backward_ctx = ctx; }
+        set_parents(var, &weight, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}

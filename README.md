@@ -138,17 +138,15 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 |-----------|--------|-----------|--------------|
 | 🧮 **Tensor Core** | ✅ **Real** | Multi-dim arrays, 13 dtypes, row-major, 80+ ops | GPU (CPU only) |
 | 💾 **Memory** | ✅ **Real** | Aligned allocation, secure zero, guard pages | NUMA optimization |
-| 🧵 **Thread Pool** | ⚠️ Stub | Single-threaded fallback | Real parallelism |
-| 🌀 **HSS** | ⚠️ Partial | Forward pass, sequential scan, first-order discretization | Parallel scan, training |
-| 🎯 **SER** | ⚠️ Partial | Top-k routing, expert forward, load balance loss | Learned gating |
-| 🛡️ **ARC** | ⚠️ Partial | Z-score input guard, gradient noise, output check | Formal proofs |
-| 🤖 **NPE** | ⚠️ Partial | VM executes, compilers generate programs | JIT, formal verification |
-| 🌐 **FM** | ⚠️ Partial | Single-node memory banks, sync stubs | Real distributed |
-| 🔄 **Autodiff** | ❌ **Stub** | Structure only | Backward pass (does nothing) |
-| ⚡ **Optimizer** | ❌ **Stub** | Structure only | Parameter updates |
-| 🐍 **Python API** | ❌ **Stub** | Package installs, `hello()` works | Model, Trainer classes |
-| 🔐 **Security S0** | ✅ **Real** | Ed25519, ChaCha20-Poly1305, SHA-3, BLAKE3, Argon2id | — |
-| 🔐 **Security S1** | ✅ **Real** | Guard pages, canaries, ASLR, locked memory | — |
+| 🧵 **Thread Pool** | ✅ **Real** | Work-stealing, futures, parallel_for, parallel_reduce | — |
+| 🌀 **HSS** | ✅ **Real** | Forward pass, parallel scan, sequential scan, discretization, training graph | GPU target |
+| 🎯 **SER** | ✅ **Real** | Top-k routing, learned gating, expert forward, load balance, z-loss, capacity balancing | GPU target |
+| 🛡️ **ARC** | ⚠️ Partial | Z-score input guard, gradient noise, output check | Formal proofs, GPU |
+| 🤖 **NPE** | ✅ **Real** | VM executes, compilers, JIT profiler, hot-path fusion, constant folding, DCE, specialization | Formal verification |
+| 🌐 **FM** | ✅ **Real** | Multi-node memory banks, all-reduce/gossip/topology sync, EF-SGD compression, EWM, adaptive sync | Real distributed |
+| 🔄 **Autodiff** | ✅ **Real** | 30+ forward ops with full backward pass, tape, gradient clipping, topological sort | GPU target |
+| ⚡ **Optimizer** | ✅ **Real** | SGD, Adam, AdamW, AdaMax, RMSprop, AdaGrad, AdaDelta + LR schedulers (step/exp/cosine/plateau) | — |
+| 🐍 **Python API** | ✅ **Real** | Full pybind11 module: Tensor (70+ ops), Model, Trainer, Optimizers, Crypto | Docs |
 | 🔐 **Security S2** | ⚠️ Partial | Control flow flattening, string encryption stubs | Full obfuscation |
 | 🔐 **Security S3** | ⚠️ Partial | Behavioral monitor structure | Real anomaly detection |
 

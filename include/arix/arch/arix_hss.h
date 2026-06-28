@@ -45,6 +45,7 @@ int arix_hss_forward(ArixHSSModel* model, const ArixTensor* input, ArixTensor** 
 void arix_hss_discretize(ArixHSSLayer* layer);
 void arix_hss_step(const ArixHSSLayer* layer, const ArixTensor* x, ArixTensor* h_next);
 void arix_hss_scan(const ArixHSSLayer* layer, const ArixTensor* x_seq, ArixTensor* h_seq, ArixTensor* y_seq);
+void arix_hss_parallel_scan(const ArixHSSLayer* layer, const ArixTensor* x_seq, ArixTensor* h_seq, ArixTensor* y_seq);
 void arix_hss_hierarchical_scan(const ArixHSSLayer* layer, const ArixTensor* x_seq, ArixTensor* y_seq);
 size_t arix_hss_get_params(const ArixHSSModel* model, ArixTensor** out_params, size_t max_params);
 int arix_hss_build_train_graph(ArixHSSModel* model, ArixTape* tape,

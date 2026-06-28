@@ -57,9 +57,19 @@ void arix_ser_layer_destroy(ArixSERLayer* layer);
 ArixSERModel* arix_ser_model_create(const ArixSERConfig* config, unsigned int seed, size_t num_layers);
 void arix_ser_model_destroy(ArixSERModel* model);
 void arix_ser_route(ArixSERLayer* layer, const ArixTensor* input, ArixTensor** gate_weights, int** expert_indices);
+void arix_ser_gate_forward(const ArixSERLayer* layer, const ArixTensor* input,
+                           ArixTensor** gate_weights, int** expert_indices,
+                           ArixTensor** gate_logits, float temperature);
 void arix_ser_expert_forward(const ArixExpert* expert, const ArixTensor* input, ArixTensor* output);
 void arix_ser_forward(ArixSERLayer* layer, const ArixTensor* input, ArixTensor** output);
 float arix_ser_load_balance_loss(const ArixTensor* gate_weights, const int* expert_indices, size_t num_tokens);
+float arix_ser_z_loss(const ArixTensor* gate_logits);
+float arix_ser_aux_loss(const ArixTensor* gate_weights, const int* expert_indices,
+                        const ArixTensor* gate_logits, size_t num_tokens,
+                        float load_balance_coef, float z_loss_coef);
+void arix_ser_expert_capacity_balance(ArixTensor* gate_weights, int* expert_indices,
+                                      size_t num_tokens, size_t num_active,
+                                      size_t expert_capacity);
 size_t arix_ser_get_params(const ArixSERModel* model, ArixTensor** out_params, size_t max_params);
 int arix_ser_build_train_graph(ArixSERModel* model, ArixTape* tape,
                                ArixVariable* input_var,

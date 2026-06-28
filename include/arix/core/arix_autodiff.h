@@ -67,4 +67,21 @@ ArixVariable* arix_layer_norm(ArixTape* tape, ArixVariable* a, ArixVariable* gam
 ArixVariable* arix_conv2d(ArixTape* tape, ArixVariable* input, ArixVariable* kernel, size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w);
 ArixVariable* arix_concat(ArixTape* tape, ArixVariable** vars, size_t num_vars, size_t dim);
 
+ArixVariable* arix_sqrt(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_abs(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_sin(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_cos(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_tan(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_asin(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_acos(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_atan(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_sinh(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_cosh(ArixTape* tape, ArixVariable* a);
+ArixVariable* arix_var(ArixTape* tape, ArixVariable* a, size_t dim);
+ArixVariable* arix_std(ArixTape* tape, ArixVariable* a, size_t dim);
+ArixVariable* arix_cross_entropy(ArixTape* tape, ArixVariable* pred, ArixVariable* target);
+ArixVariable* arix_nll_loss(ArixTape* tape, ArixVariable* pred, ArixVariable* target);
+ArixVariable* arix_bce_loss(ArixTape* tape, ArixVariable* pred, ArixVariable* target);
+ArixVariable* arix_embedding(ArixTape* tape, ArixVariable* weight, ArixVariable* indices);
+
 #endif

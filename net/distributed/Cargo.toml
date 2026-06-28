@@ -1,0 +1,23 @@
+[package]
+name = "arix-distributed"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ammar [ARIX] <algoarix@gmail.com>"]
+description = "Distributed training coordination for ARIX-Algo: node discovery, ring all-reduce, parameter sync, fault tolerance, differential privacy"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+tokio = { version = "1", features = ["full", "rt-multi-thread", "sync", "net", "time", "io-util"] }
+libc = "0.2"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

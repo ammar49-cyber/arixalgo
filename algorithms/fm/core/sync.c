@@ -209,3 +209,166 @@ int arix_fm_sync_topology(ArixFMController* ctrl) {
     ctrl->sync_state.sync_round++;
     return 0;
 }
+
+// ── Error-compensated gradient compression (EF-SGD) ──────────────────────────
+
+ArixFMErrorFeedback* arix_fm_error_feedback_create(size_t dim, float ratio) {
+    if (dim == 0 || ratio <= 0.0f) return NULL;
+    ArixFMErrorFeedback* ef = (ArixFMErrorFeedback*)arix_malloc(sizeof(ArixFMErrorFeedback), 64);
+    if (!ef) return NULL;
+    memset(ef, 0, sizeof(ArixFMErrorFeedback));
+
+    size_t shape[] = {dim};
+    ef->error_buffer = arix_tensor_zeros(shape, 1, ARIX_FLOAT32);
+    ef->compressed_grad = arix_tensor_zeros(shape, 1, ARIX_FLOAT32);
+    if (!ef->error_buffer || !ef->compressed_grad) {
+        arix_fm_error_feedback_destroy(ef);
+        return NULL;
+    }
+    ef->compression_ratio = ratio;
+    ef->dim = dim;
+    return ef;
+}
+
+void arix_fm_error_feedback_destroy(ArixFMErrorFeedback* ef) {
+    if (!ef) return;
+    if (ef->error_buffer) arix_tensor_destroy(ef->error_buffer);
+    if (ef->compressed_grad) arix_tensor_destroy(ef->compressed_grad);
+    arix_free(ef, sizeof(ArixFMErrorFeedback));
+}
+
+ArixTensor* arix_fm_compress_with_error(ArixFMErrorFeedback* ef, const ArixTensor* gradient) {
+    if (!ef || !gradient) return NULL;
+
+    ArixTensor* g_eff = arix_tensor_add(gradient, ef->error_buffer);
+    if (!g_eff) return NULL;
+
+    ArixTensor* g_comp = arix_fm_compress_gradients(g_eff, ef->compression_ratio);
+    arix_tensor_destroy(g_eff);
+    if (!g_comp) return NULL;
+
+    ArixTensor* diff = arix_tensor_sub(gradient, g_comp);
+    if (diff) {
+        ArixTensor* new_error = arix_tensor_add(ef->error_buffer, diff);
+        if (new_error) {
+            arix_tensor_destroy(ef->error_buffer);
+            ef->error_buffer = new_error;
+        }
+        arix_tensor_destroy(diff);
+    }
+
+    if (ef->compressed_grad) arix_tensor_destroy(ef->compressed_grad);
+    ef->compressed_grad = arix_tensor_copy(g_comp);
+
+    return g_comp;
+}
+
+// ── Exponential moving average for catastrophic forgetting protection ────────
+
+void arix_fm_ewm_update(ArixFMMemoryBank* bank, float alpha) {
+    if (!bank || bank->num_entries == 0 || alpha < 0.0f || alpha > 1.0f) return;
+    size_t dim = bank->keys->shape[1];
+    size_t n = bank->num_entries;
+    float* vals = (float*)bank->values->data;
+
+    float* old_vals = (float*)malloc(n * dim * sizeof(float));
+    if (!old_vals) return;
+    memcpy(old_vals, vals, n * dim * sizeof(float));
+
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < dim; j++) {
+            vals[i * dim + j] = alpha * old_vals[i * dim + j] + (1.0f - alpha) * vals[i * dim + j];
+        }
+    }
+    free(old_vals);
+}
+
+// ── Adaptive sync frequency ──────────────────────────────────────────────────
+
+float arix_fm_compute_change_rate(ArixFMMemoryBank* bank, const ArixTensor* new_values) {
+    if (!bank || !new_values || bank->num_entries == 0) return 0.0f;
+    size_t dim = bank->keys->shape[1];
+    float* vals = (float*)bank->values->data;
+    float* nv = (float*)new_values->data;
+    size_t n_entries = bank->num_entries;
+    size_t nv_entries = new_values->size / dim;
+    size_t n = n_entries < nv_entries ? n_entries : nv_entries;
+
+    float total_diff = 0.0f;
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < dim; j++) {
+            float d = vals[i * dim + j] - nv[i * dim + j];
+            total_diff += d * d;
+        }
+    }
+    return sqrtf(total_diff / (float)(n * dim) + 1e-10f);
+}
+
+size_t arix_fm_adaptive_sync_interval(ArixFMController* ctrl, float base_interval) {
+    if (!ctrl || base_interval < 1.0f) base_interval = 1.0f;
+    float total_contrib = 0.0f;
+    float contrib_sq = 0.0f;
+    size_t n_online = 0;
+    for (size_t i = 0; i < ctrl->config.num_nodes; i++) {
+        if (ctrl->nodes[i]->is_online) {
+            float c = ctrl->sync_state.node_contributions ? ctrl->sync_state.node_contributions[i] : 0.0f;
+            total_contrib += c;
+            contrib_sq += c * c;
+            n_online++;
+        }
+    }
+    if (n_online == 0) return (size_t)base_interval;
+
+    float mean = total_contrib / (float)n_online;
+    float variance = contrib_sq / (float)n_online - mean * mean;
+    if (variance < 0.0f) variance = 0.0f;
+    float stddev = sqrtf(variance + 1e-10f);
+
+    float multiplier = 1.0f / (1.0f + stddev);
+    if (multiplier < 0.1f) multiplier = 0.1f;
+    if (multiplier > 2.0f) multiplier = 2.0f;
+
+    return (size_t)(base_interval * multiplier + 0.5f);
+}
+
+// ── Gradient send / receive ──────────────────────────────────────────────────
+
+int arix_fm_send_gradients(ArixFMController* ctrl, size_t node_id, const ArixTensor* gradients) {
+    if (!ctrl || !gradients || node_id >= ctrl->config.num_nodes) return 1;
+    ArixFMNode* node = ctrl->nodes[node_id];
+    if (!node->is_online) return 1;
+
+    if (!node->gradient_accumulator) {
+        node->gradient_accumulator = arix_tensor_copy(gradients);
+        return node->gradient_accumulator ? 0 : 1;
+    }
+
+    ArixTensor* updated = arix_tensor_add(node->gradient_accumulator, gradients);
+    if (!updated) return 1;
+    arix_tensor_destroy(node->gradient_accumulator);
+    node->gradient_accumulator = updated;
+    return 0;
+}
+
+int arix_fm_receive_gradients(ArixFMController* ctrl, size_t node_id, ArixTensor* aggregated) {
+    if (!ctrl || !aggregated || node_id >= ctrl->config.num_nodes) return 1;
+
+    memset((float*)aggregated->data, 0, aggregated->size * sizeof(float));
+
+    for (size_t i = 0; i < ctrl->config.num_nodes; i++) {
+        if (!ctrl->nodes[i]->is_online) continue;
+        if (i == node_id) continue;
+        ArixFMNode* node = ctrl->nodes[i];
+        if (!node->gradient_accumulator) continue;
+
+        float* grad_data = (float*)node->gradient_accumulator->data;
+        float* agg_data = (float*)aggregated->data;
+        size_t min_size = node->gradient_accumulator->size < aggregated->size
+                              ? node->gradient_accumulator->size
+                              : aggregated->size;
+        for (size_t j = 0; j < min_size; j++) {
+            agg_data[j] += grad_data[j];
+        }
+    }
+    return 0;
+}
