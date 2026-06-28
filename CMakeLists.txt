@@ -69,7 +69,7 @@ if(ARIX_USE_LTO)
     endif()
 endif()
 
-file(GLOB_RECURSE ARIX_CORE_SRC src/core/src/*.c)
+file(GLOB_RECURSE ARIX_CORE_SRC kernel/*.c)
 file(GLOB_RECURSE ARIX_SECURITY_C_SRC src/security/c/src/*.c)
 
 add_library(arix_core STATIC ${ARIX_CORE_SRC})
