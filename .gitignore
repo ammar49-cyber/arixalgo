@@ -74,3 +74,5 @@ CMakeLists_standalone.txt
 # *.key, *.pem, *.secret — should never be in repo; block via pre-commit
 
 target/
+Cargo.lock
+
