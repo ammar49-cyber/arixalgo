@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/CMake-3.16-064F8C?style=for-the-badge&logo=cmake" alt="CMake 3.16"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License MIT"/>
   <img src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge" alt="Build Passing"/>
-  <img src="https://img.shields.io/badge/tests-50%2F52%20passing-success?style=for-the-badge" alt="50/52 Tests Passing"/>
+  <img src="https://img.shields.io/badge/tests-54%2F56%20passing-success?style=for-the-badge" alt="54/56 Tests Passing"/>
   <img src="https://img.shields.io/badge/security-S0%2FS1%20complete-important?style=for-the-badge" alt="Security S0/S1 Complete"/>
 </p>
 
@@ -156,7 +156,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 
 | Component | C/C++ LOC | Tests | Status |
 |-----------|-----------|-------|--------|
-| 🧮 Tensor Core | ~2,500 | 57+27 edge + 19 creation + 29 shape | ✅ |
+| 🧮 Tensor Core | ~3,000 | 57 edge + 19 creation + 29 shape + 17 ops + 14 reduction + 14 NN + 9 I/O | ✅ |
 | 💾 Memory | ~800 | 13 | ✅ |
 | 🧵 Thread Pool | ~300 | 11 | ⚠️ |
 | 🌀 HSS | ~500 | 2 | ⚠️ |
@@ -178,7 +178,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 ## ✅ What You Can Do
 
 - ✅ **Build the project from source** — on Windows, Linux, or macOS
-- ✅ **Run all tests** — 50/52 pass (2 pre-existing S0 edge cases)
+- ✅ **Run all tests** — 54/56 pass (2 pre-existing S0 edge cases)
 - ✅ **Run demos** — HSS, SER, ARC, NPE, FM all have working examples
 - ✅ **Audit the security code** — S0 and S1 are production-grade cryptography
 - ✅ **Read the architecture** — Full mathematical documentation included
@@ -472,6 +472,10 @@ Core  Secure Engine  Engine  Sec   San    Sec   Sec    Verif  Report
 │   ├── test_tensor_edge.c      # 🧮 Edge cases (57 tests)
 │   ├── test_tensor_creation.c  # 🧮 Creation functions (19 tests)
 │   ├── test_tensor_shape.c     # 🧮 Shape manipulation (29 tests)
+│   ├── test_tensor_ops.c       # 🧮 Element-wise + comparison (17 tests)
+│   ├── test_tensor_reduction.c # 🧮 Reduction + linear algebra (14 tests)
+│   ├── test_tensor_nn.c        # 🧮 Neural network ops (14 tests)
+│   ├── test_tensor_io.c        # 🧮 Save/load + conversion (9 tests)
 │   ├── test_autodiff.c         # 🔄 Autodiff operations
 │   ├── test_autodiff_edge.c    # 🔄 Autodiff edge cases (27 tests)
 │   ├── test_memory.c           # 💾 Memory allocator

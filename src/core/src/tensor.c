@@ -708,13 +708,49 @@ ArixTensor* arix_tensor_to_layout(const ArixTensor* src, ArixLayout layout) {
 }
 
 int arix_tensor_save(const ArixTensor* src, const char* path) {
-    (void)src; (void)path;
-    return -1;
+    if (!src || !path) return -1;
+    FILE* f = fopen(path, "wb");
+    if (!f) return -1;
+    uint32_t magic = 0x41524958;
+    uint32_t version = 1;
+    fwrite(&magic, sizeof(magic), 1, f);
+    fwrite(&version, sizeof(version), 1, f);
+    uint64_t ndim = (uint64_t)src->ndim;
+    fwrite(&ndim, sizeof(ndim), 1, f);
+    for (size_t i = 0; i < src->ndim; i++) {
+        uint64_t dim = (uint64_t)src->shape[i];
+        fwrite(&dim, sizeof(dim), 1, f);
+    }
+    uint32_t dtype = (uint32_t)src->dtype;
+    fwrite(&dtype, sizeof(dtype), 1, f);
+    fwrite(src->data, src->size * src->item_size, 1, f);
+    fclose(f);
+    return 0;
 }
 
 ArixTensor* arix_tensor_load(const char* path) {
-    (void)path;
-    return NULL;
+    if (!path) return NULL;
+    FILE* f = fopen(path, "rb");
+    if (!f) return NULL;
+    uint32_t magic, version;
+    if (fread(&magic, sizeof(magic), 1, f) != 1 || magic != 0x41524958) { fclose(f); return NULL; }
+    if (fread(&version, sizeof(version), 1, f) != 1 || version != 1) { fclose(f); return NULL; }
+    uint64_t ndim;
+    if (fread(&ndim, sizeof(ndim), 1, f) != 1) { fclose(f); return NULL; }
+    size_t shape[16];
+    for (uint64_t i = 0; i < ndim; i++) {
+        uint64_t dim;
+        if (fread(&dim, sizeof(dim), 1, f) != 1) { fclose(f); return NULL; }
+        shape[i] = (size_t)dim;
+    }
+    uint32_t dtype;
+    if (fread(&dtype, sizeof(dtype), 1, f) != 1) { fclose(f); return NULL; }
+    ArixTensor* tensor = arix_tensor_create(shape, (size_t)ndim, (ArixDtype)dtype);
+    if (!tensor) { fclose(f); return NULL; }
+    size_t bytes = tensor->size * tensor->item_size;
+    if (fread(tensor->data, bytes, 1, f) != 1) { arix_tensor_destroy(tensor); fclose(f); return NULL; }
+    fclose(f);
+    return tensor;
 }
 
 static ArixTensor* compare_op(const ArixTensor* a, const ArixTensor* b, int (*cmp)(float, float)) {
@@ -1017,33 +1053,209 @@ ArixTensor* arix_tensor_transpose(const ArixTensor* src, size_t dim1, size_t dim
 }
 
 ArixTensor* arix_tensor_inverse(const ArixTensor* src) {
-    (void)src;
-    return NULL;
+    if (!src || src->ndim != 2 || src->shape[0] != src->shape[1]) return NULL;
+    size_t n = src->shape[0];
+    ArixTensor* result = arix_tensor_create(src->shape, 2, ARIX_FLOAT32);
+    if (!result) return NULL;
+    float* a = (float*)aligned_alloc_wrapper(n * n * 2 * sizeof(float), 64);
+    if (!a) { arix_tensor_destroy(result); return NULL; }
+    float* s = (float*)src->data;
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < n; j++) a[i * 2 * n + j] = s[i * n + j];
+        for (size_t j = 0; j < n; j++) a[i * 2 * n + n + j] = (i == j) ? 1.0f : 0.0f;
+    }
+    for (size_t i = 0; i < n; i++) {
+        size_t pivot = i;
+        for (size_t r = i + 1; r < n; r++)
+            if (fabsf(a[r * 2 * n + i]) > fabsf(a[pivot * 2 * n + i])) pivot = r;
+        if (pivot != i)
+            for (size_t j = 0; j < 2 * n; j++) { float t = a[i * 2 * n + j]; a[i * 2 * n + j] = a[pivot * 2 * n + j]; a[pivot * 2 * n + j] = t; }
+        float piv = a[i * 2 * n + i];
+        if (fabsf(piv) < 1e-10f) { arix_free(a, n * n * 2 * sizeof(float)); arix_tensor_destroy(result); return NULL; }
+        for (size_t j = 0; j < 2 * n; j++) a[i * 2 * n + j] /= piv;
+        for (size_t k = 0; k < n; k++) {
+            if (k == i) continue;
+            float factor = a[k * 2 * n + i];
+            for (size_t j = 0; j < 2 * n; j++) a[k * 2 * n + j] -= factor * a[i * 2 * n + j];
+        }
+    }
+    float* rd = (float*)result->data;
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++)
+            rd[i * n + j] = a[i * 2 * n + n + j];
+    arix_free(a, n * n * 2 * sizeof(float));
+    return result;
 }
 
 float arix_tensor_det(const ArixTensor* src) {
-    (void)src;
-    return 0.0f;
+    if (!src || src->ndim != 2 || src->shape[0] != src->shape[1]) return 0.0f;
+    size_t n = src->shape[0];
+    float* m = (float*)aligned_alloc_wrapper(n * n * sizeof(float), 64);
+    if (!m) return 0.0f;
+    float* s = (float*)src->data;
+    for (size_t i = 0; i < n * n; i++) m[i] = s[i];
+    float det = 1.0f;
+    for (size_t i = 0; i < n; i++) {
+        size_t pivot = i;
+        for (size_t j = i + 1; j < n; j++)
+            if (fabsf(m[j * n + i]) > fabsf(m[pivot * n + i])) pivot = j;
+        if (pivot != i) {
+            for (size_t j = 0; j < n; j++) { float t = m[i * n + j]; m[i * n + j] = m[pivot * n + j]; m[pivot * n + j] = t; }
+            det = -det;
+        }
+        if (fabsf(m[i * n + i]) < 1e-10f) { arix_free(m, n * n * sizeof(float)); return 0.0f; }
+        det *= m[i * n + i];
+        for (size_t j = i + 1; j < n; j++) {
+            float f = m[j * n + i] / m[i * n + i];
+            for (size_t k = i + 1; k < n; k++)
+                m[j * n + k] -= f * m[i * n + k];
+        }
+    }
+    arix_free(m, n * n * sizeof(float));
+    return det;
 }
 
 ArixTensor* arix_tensor_conv1d(const ArixTensor* input, const ArixTensor* kernel, size_t stride, size_t padding) {
-    (void)input; (void)kernel; (void)stride; (void)padding;
-    return NULL;
+    if (!input || !kernel || stride == 0) return NULL;
+    size_t L = input->shape[input->ndim - 1];
+    size_t K = kernel->shape[kernel->ndim - 1];
+    size_t out_len = (L + 2 * padding - K) / stride + 1;
+    if (out_len == 0) return NULL;
+    size_t out_ndim = input->ndim;
+    size_t out_shape[16];
+    for (size_t i = 0; i < out_ndim - 1; i++) out_shape[i] = input->shape[i];
+    out_shape[out_ndim - 1] = out_len;
+    ArixTensor* result = arix_tensor_zeros(out_shape, out_ndim, ARIX_FLOAT32);
+    if (!result) return NULL;
+    float* id = (float*)input->data;
+    float* kd = (float*)kernel->data;
+    float* rd = (float*)result->data;
+    size_t in_channels = input->shape[input->ndim - 2];
+    size_t kernel_channels = kernel->shape[kernel->ndim - 2];
+    size_t batch = input->size / (in_channels * L);
+    for (size_t b = 0; b < batch; b++) {
+        for (size_t c_in = 0; c_in < in_channels; c_in++) {
+            for (size_t c_out = 0; c_out < kernel_channels; c_out++) {
+                for (size_t pos = 0; pos < out_len; pos++) {
+                    float sum = 0.0f;
+                    for (size_t k = 0; k < K; k++) {
+                        int inp_pos = (int)(pos * stride + k) - (int)padding;
+                        if (inp_pos >= 0 && inp_pos < (int)L)
+                            sum += id[b * in_channels * L + c_in * L + inp_pos] * kd[c_out * in_channels * K + c_in * K + k];
+                    }
+                    rd[b * kernel_channels * out_len + c_out * out_len + pos] += sum;
+                }
+            }
+        }
+    }
+    return result;
 }
 
 ArixTensor* arix_tensor_conv2d(const ArixTensor* input, const ArixTensor* kernel, size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w) {
-    (void)input; (void)kernel; (void)stride_h; (void)stride_w; (void)pad_h; (void)pad_w;
-    return NULL;
+    if (!input || !kernel || stride_h == 0 || stride_w == 0) return NULL;
+    size_t H = input->shape[input->ndim - 2], W = input->shape[input->ndim - 1];
+    size_t KH = kernel->shape[kernel->ndim - 2], KW = kernel->shape[kernel->ndim - 1];
+    size_t out_h = (H + 2 * pad_h - KH) / stride_h + 1;
+    size_t out_w = (W + 2 * pad_w - KW) / stride_w + 1;
+    if (out_h == 0 || out_w == 0) return NULL;
+    size_t out_ndim = input->ndim;
+    size_t out_shape[16];
+    for (size_t i = 0; i < out_ndim - 2; i++) out_shape[i] = input->shape[i];
+    out_shape[out_ndim - 2] = out_h;
+    out_shape[out_ndim - 1] = out_w;
+    ArixTensor* result = arix_tensor_zeros(out_shape, out_ndim, ARIX_FLOAT32);
+    if (!result) return NULL;
+    float* id = (float*)input->data;
+    float* kd = (float*)kernel->data;
+    float* rd = (float*)result->data;
+    size_t in_channels = input->shape[input->ndim - 3];
+    size_t out_channels = kernel->shape[kernel->ndim - 3];
+    size_t batch = input->size / (in_channels * H * W);
+    for (size_t b = 0; b < batch; b++) {
+        for (size_t co = 0; co < out_channels; co++) {
+            for (size_t ci = 0; ci < in_channels; ci++) {
+                for (size_t oh = 0; oh < out_h; oh++) {
+                    for (size_t ow = 0; ow < out_w; ow++) {
+                        float sum = 0.0f;
+                        for (size_t kh = 0; kh < KH; kh++) {
+                            int ih = (int)(oh * stride_h + kh) - (int)pad_h;
+                            for (size_t kw = 0; kw < KW; kw++) {
+                                int iw = (int)(ow * stride_w + kw) - (int)pad_w;
+                                if (ih >= 0 && ih < (int)H && iw >= 0 && iw < (int)W)
+                                    sum += id[b * in_channels * H * W + ci * H * W + (size_t)ih * W + (size_t)iw]
+                                         * kd[co * in_channels * KH * KW + ci * KH * KW + kh * KW + kw];
+                            }
+                        }
+                        rd[b * out_channels * out_h * out_w + co * out_h * out_w + oh * out_w + ow] += sum;
+                    }
+                }
+            }
+        }
+    }
+    return result;
 }
 
 ArixTensor* arix_tensor_pool1d(const ArixTensor* src, size_t kernel_size, size_t stride) {
-    (void)src; (void)kernel_size; (void)stride;
-    return NULL;
+    if (!src || kernel_size == 0 || stride == 0) return NULL;
+    size_t L = src->shape[src->ndim - 1];
+    size_t out_len = (L - kernel_size) / stride + 1;
+    if (out_len == 0) return NULL;
+    size_t out_ndim = src->ndim;
+    size_t out_shape[16];
+    for (size_t i = 0; i < out_ndim - 1; i++) out_shape[i] = src->shape[i];
+    out_shape[out_ndim - 1] = out_len;
+    ArixTensor* result = arix_tensor_zeros(out_shape, out_ndim, ARIX_FLOAT32);
+    if (!result) return NULL;
+    float* sd = (float*)src->data;
+    float* rd = (float*)result->data;
+    size_t channels = src->shape[src->ndim - 2];
+    size_t batch = src->size / (channels * L);
+    for (size_t b = 0; b < batch; b++) {
+        for (size_t c = 0; c < channels; c++) {
+            for (size_t pos = 0; pos < out_len; pos++) {
+                float max_val = -FLT_MAX;
+                for (size_t k = 0; k < kernel_size; k++)
+                    if (sd[b * channels * L + c * L + pos * stride + k] > max_val)
+                        max_val = sd[b * channels * L + c * L + pos * stride + k];
+                rd[b * channels * out_len + c * out_len + pos] = max_val;
+            }
+        }
+    }
+    return result;
 }
 
 ArixTensor* arix_tensor_pool2d(const ArixTensor* src, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w) {
-    (void)src; (void)kernel_h; (void)kernel_w; (void)stride_h; (void)stride_w;
-    return NULL;
+    if (!src || kernel_h == 0 || kernel_w == 0 || stride_h == 0 || stride_w == 0) return NULL;
+    size_t H = src->shape[src->ndim - 2], W = src->shape[src->ndim - 1];
+    size_t out_h = (H - kernel_h) / stride_h + 1;
+    size_t out_w = (W - kernel_w) / stride_w + 1;
+    if (out_h == 0 || out_w == 0) return NULL;
+    size_t out_ndim = src->ndim;
+    size_t out_shape[16];
+    for (size_t i = 0; i < out_ndim - 2; i++) out_shape[i] = src->shape[i];
+    out_shape[out_ndim - 2] = out_h;
+    out_shape[out_ndim - 1] = out_w;
+    ArixTensor* result = arix_tensor_zeros(out_shape, out_ndim, ARIX_FLOAT32);
+    if (!result) return NULL;
+    float* sd = (float*)src->data;
+    float* rd = (float*)result->data;
+    size_t channels = src->shape[src->ndim - 3];
+    size_t batch = src->size / (channels * H * W);
+    for (size_t b = 0; b < batch; b++) {
+        for (size_t c = 0; c < channels; c++) {
+            for (size_t oh = 0; oh < out_h; oh++) {
+                for (size_t ow = 0; ow < out_w; ow++) {
+                    float max_val = -FLT_MAX;
+                    for (size_t kh = 0; kh < kernel_h; kh++)
+                        for (size_t kw = 0; kw < kernel_w; kw++)
+                            if (sd[b * channels * H * W + c * H * W + (oh * stride_h + kh) * W + (ow * stride_w + kw)] > max_val)
+                                max_val = sd[b * channels * H * W + c * H * W + (oh * stride_h + kh) * W + (ow * stride_w + kw)];
+                    rd[b * channels * out_h * out_w + c * out_h * out_w + oh * out_w + ow] = max_val;
+                }
+            }
+        }
+    }
+    return result;
 }
 
 ArixTensor* arix_tensor_softmax(const ArixTensor* src, size_t dim) {
