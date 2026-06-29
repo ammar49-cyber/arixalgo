@@ -2,9 +2,18 @@
 #include "arix_sha512.h"
 #include "arix_ct.h"
 #include <string.h>
+#include <intrin.h>
 
 /* GF(2^255-19) field element: 5 limbs of 51 bits */
 typedef struct { uint64_t v[5]; } field;
+typedef struct { uint64_t lo, hi; } uint128;
+
+static uint128 add128(uint128 a, uint128 b) {
+    uint128 r; r.lo = a.lo + b.lo; r.hi = a.hi + b.hi + (r.lo < a.lo ? 1 : 0); return r;
+}
+static uint128 mul64_64(uint64_t a, uint64_t b) {
+    uint128 r; r.lo = _umul128(a, b, &r.hi); return r;
+}
 
 static const field D = {{
     0x0000000000000019ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
@@ -21,6 +30,9 @@ static const field SQRTM1 = {{
 
 static uint64_t mask51(uint64_t x) { return x & 0x7ffffffffffffULL; }
 static uint64_t reduce51(uint64_t x) { return (x >> 51) + (x & 0x7ffffffffffffULL); }
+static uint128 rshift128(uint128 x, unsigned s) {
+    uint128 r; r.lo = (x.lo >> s) | (x.hi << (64 - s)); r.hi = x.hi >> s; return r;
+}
 
 static void fe_add(field* r, const field* a, const field* b) {
     for (int i = 0; i < 5; i++) r->v[i] = a->v[i] + b->v[i];
@@ -35,23 +47,34 @@ static void fe_sub(field* r, const field* a, const field* b) {
 }
 
 static void fe_mul(field* r, const field* a, const field* b) {
-    uint64_t t[9] = {0};
+    uint128 t[9] = {0};
     for (int i = 0; i < 5; i++)
         for (int j = 0; j < 5; j++) {
             int k = i + j;
-            if (k < 9) t[k] += a->v[i] * b->v[j];
+            if (k < 9) t[k] = add128(t[k], mul64_64(a->v[i], b->v[j]));
         }
+    /* Fold high terms (×19) back into lower 5 */
     for (int i = 8; i >= 5; i--) {
-        t[i - 5] += 19 * (t[i] >> 51);
-        t[i - 4] += 19 * (t[i] & 0x7ffffffffffffULL);
+        uint64_t low51 = t[i].lo & 0x7ffffffffffffULL;
+        uint128 high = rshift128(t[i], 51);
+        t[i-5] = add128(t[i-5], mul64_64(19, low51));
+        t[i-4] = add128(t[i-4], mul64_64(19, high.lo));
     }
-    uint64_t c0 = t[0] >> 51; t[1] += c0; t[0] = mask51(t[0]);
-    uint64_t c1 = t[1] >> 51; t[2] += c1; t[1] = mask51(t[1]);
-    uint64_t c2 = t[2] >> 51; t[3] += c2; t[2] = mask51(t[2]);
-    uint64_t c3 = t[3] >> 51; t[4] += c3; t[3] = mask51(t[3]);
-    uint64_t c4 = t[4] >> 51; t[0] += 19 * c4; t[4] = mask51(t[4]);
-    c0 = t[0] >> 51; t[1] += c0; t[0] = mask51(t[0]);
-    for (int i = 0; i < 5; i++) r->v[i] = t[i];
+    /* Two rounds of carry propagation */
+    for (int round = 0; round < 2; round++) {
+        uint128 carry;
+        carry = rshift128(t[0], 51); t[0].lo = mask51(t[0].lo);
+        t[1] = add128(t[1], carry);
+        carry = rshift128(t[1], 51); t[1].lo = mask51(t[1].lo);
+        t[2] = add128(t[2], carry);
+        carry = rshift128(t[2], 51); t[2].lo = mask51(t[2].lo);
+        t[3] = add128(t[3], carry);
+        carry = rshift128(t[3], 51); t[3].lo = mask51(t[3].lo);
+        t[4] = add128(t[4], carry);
+        carry = rshift128(t[4], 51); t[4].lo = mask51(t[4].lo);
+        t[0] = add128(t[0], mul64_64(19, carry.lo));
+    }
+    for (int i = 0; i < 5; i++) r->v[i] = t[i].lo;
 }
 
 static void fe_sq(field* r, const field* a) { fe_mul(r, a, a); }
