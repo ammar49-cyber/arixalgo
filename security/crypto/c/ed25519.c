@@ -170,7 +170,7 @@ static void point_scalar_mult(point* r, const uint8_t* scalar, size_t sc_len, co
         uint8_t bit = (scalar[i / 8] >> (i % 8)) & 1;
         point t; memcpy(&t, r, sizeof(t));
         point_add(&t, &t, base);
-        uint8_t mask = (uint8_t)(-(int)bit);
+        uint64_t mask = (uint64_t)(-(int)bit);
         for (int j = 0; j < 5; j++) {
             r->X.v[j] ^= mask & (r->X.v[j] ^ t.X.v[j]);
             r->Y.v[j] ^= mask & (r->Y.v[j] ^ t.Y.v[j]);
