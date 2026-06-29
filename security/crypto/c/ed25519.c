@@ -117,7 +117,14 @@ static void fe_to_bytes(uint8_t b[32], const field* r) {
         uint64_t c3 = t[3] >> 51; t[4] += c3; t[3] = mask51(t[3]);
         uint64_t c4 = t[4] >> 51; t[0] += 19 * c4; t[4] = mask51(t[4]);
     }
-    /* Write bytes, then subtract p if value >= p */
+    /* Write bytes, then subtract p from limbs if value >= p */
+    { int ge = 1;
+      for (int i = 4; i >= 1; i--) { if (t[i] != 0x7FFFFFFFFFFFFULL) { ge = 0; break; } }
+      if (ge && t[0] >= 0x7FFFFFFFFFFEDULL) {
+          t[0] -= 0x7FFFFFFFFFFEDULL;
+          for (int i = 1; i < 5; i++) t[i] -= 0x7FFFFFFFFFFFFULL;
+      }
+    }
     b[0] = (uint8_t)t[0]; b[1] = (uint8_t)(t[0] >> 8); b[2] = (uint8_t)(t[0] >> 16); b[3] = (uint8_t)(t[0] >> 24);
     b[4] = (uint8_t)(t[0] >> 32); b[5] = (uint8_t)(t[0] >> 40); b[6] = (uint8_t)(t[1] << 3) | (uint8_t)(t[0] >> 48);
     b[7] = (uint8_t)(t[1] >> 5); b[8] = (uint8_t)(t[1] >> 13); b[9] = (uint8_t)(t[1] >> 21);
@@ -129,6 +136,19 @@ static void fe_to_bytes(uint8_t b[32], const field* r) {
     b[25] = (uint8_t)(t[4] >> 4); b[26] = (uint8_t)(t[4] >> 12); b[27] = (uint8_t)(t[4] >> 20);
     b[28] = (uint8_t)(t[4] >> 28); b[29] = (uint8_t)(t[4] >> 36); b[30] = (uint8_t)(t[4] >> 44);
     b[31] = 0;
+    /* Conditional subtract p (2^255 - 19) if packed value >= p */
+    { int ge = 1;
+      for (int i = 30; i >= 0; i--) { if (b[i] != 0xFF) { ge = (b[i] > 0xED && i == 0) || (b[i] > 0 && i > 0); break; } }
+      if (ge) {
+          uint16_t brw = 0;
+          for (int i = 0; i < 32; i++) {
+              uint16_t sub = (i == 0) ? 0xED : (i == 31) ? 0x7F : 0xFF;
+              uint16_t d = (uint16_t)b[i] - sub - brw;
+              b[i] = (uint8_t)(d & 0xFF);
+              brw = (d >> 8) & 1;
+          }
+      }
+    }
 }
 
 /* Point in extended coordinates (X, Y, Z, T) where x=X/Z, y=Y/Z, x*y=T/Z */
