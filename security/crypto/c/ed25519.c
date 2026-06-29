@@ -124,8 +124,8 @@ static void point_add(point* r, const point* p, const point* q) {
     fe_mul(&f, &p->Z, &q->Z); fe_add(&f, &f, &f);
     fe_add(&g, &c, &a); fe_sub(&h, &c, &a);
     fe_sub(&c, &f, &e); fe_add(&a, &f, &e);
-    fe_mul(&r->X, &g, &c); fe_mul(&r->Y, &h, &a);
-    fe_mul(&r->T, &g, &a); fe_mul(&r->Z, &h, &c);
+    fe_mul(&r->X, &h, &c); fe_mul(&r->Y, &a, &g);
+    fe_mul(&r->T, &h, &g); fe_mul(&r->Z, &c, &a);
 }
 
 static void point_double(point* r, const point* p) {
