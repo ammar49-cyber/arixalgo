@@ -37,6 +37,19 @@ void arix_tape_record(ArixTape* tape, ArixVariable* var) {
         tape->vars = new_vars;
     }
     tape->vars[tape->num_vars++] = var;
+    if (tape->checkpointing && var->backward_ctx && var->recompute_ctx) {
+        var->checkpointed = 1;
+        var->free_ctx(var->backward_ctx);
+        var->backward_ctx = NULL;
+    }
+}
+
+void arix_tape_checkpoint_begin(ArixTape* tape) {
+    if (tape) tape->checkpointing = 1;
+}
+
+void arix_tape_checkpoint_end(ArixTape* tape) {
+    if (tape) tape->checkpointing = 0;
 }
 
 static void tape_topological_sort(ArixTape* tape, ArixVariable** sorted, size_t* num_sorted) {
@@ -123,6 +136,10 @@ void arix_tape_backward(ArixTape* tape, ArixVariable* loss) {
     for (size_t i = num_sorted; i > 0; i--) {
         ArixVariable* var = sorted ? sorted[i - 1] : tape->vars[i - 1];
         if (!var || !var->backward_fn || !var->grad) continue;
+        if (!var->backward_ctx && var->checkpointed && var->recompute_ctx) {
+            var->backward_ctx = var->recompute_ctx(var, var->params, var->param_count);
+        }
+        if (!var->backward_ctx) continue;
         var->backward_fn(var->backward_ctx, var->grad);
         if (var->backward_ctx && var->free_ctx) {
             var->free_ctx(var->backward_ctx);

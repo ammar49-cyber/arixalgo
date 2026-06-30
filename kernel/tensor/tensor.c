@@ -38,6 +38,102 @@ static void* aligned_alloc_wrapper(size_t size, size_t alignment) {
     return arix_malloc(size, alignment);
 }
 
+/* ===== ArixStorage implementation ===== */
+
+ArixStorage* arix_storage_create(size_t num_bytes) {
+    ArixStorage* s = (ArixStorage*)aligned_alloc_wrapper(sizeof(ArixStorage), 64);
+    if (!s) return NULL;
+    s->data = aligned_alloc_wrapper(num_bytes, 64);
+    if (!s->data && num_bytes > 0) {
+        arix_free(s, sizeof(ArixStorage));
+        return NULL;
+    }
+    s->num_bytes = num_bytes;
+    s->ref_count = 1;
+    return s;
+}
+
+void arix_storage_retain(ArixStorage* s) {
+    if (s) s->ref_count++;
+}
+
+void arix_storage_release(ArixStorage* s) {
+    if (!s) return;
+    if (--s->ref_count <= 0) {
+        if (s->data) arix_free(s->data, s->num_bytes);
+        arix_free(s, sizeof(ArixStorage));
+    }
+}
+
+/* ===== View creation helpers ===== */
+
+static ArixTensor* tensor_view_alloc(const ArixTensor* src) {
+    ArixTensor* t = (ArixTensor*)aligned_alloc_wrapper(sizeof(ArixTensor), 64);
+    if (!t) return NULL;
+    size_t ndim = src->ndim > 0 ? src->ndim : 1;
+    t->shape = (size_t*)aligned_alloc_wrapper(ndim * sizeof(size_t), 64);
+    t->strides = (size_t*)aligned_alloc_wrapper(ndim * sizeof(size_t), 64);
+    if (!t->shape || !t->strides) {
+        arix_free(t->shape, ndim * sizeof(size_t));
+        arix_free(t->strides, ndim * sizeof(size_t));
+        arix_free(t, sizeof(ArixTensor));
+        return NULL;
+    }
+    return t;
+}
+
+ArixTensor* arix_tensor_as_strided(const ArixTensor* src, size_t offset, const size_t* shape, size_t ndim, const size_t* strides) {
+    if (!src) return NULL;
+    ArixTensor* t = tensor_view_alloc(src);
+    if (!t) return NULL;
+    arix_storage_retain(src->storage);
+    t->storage = src->storage;
+    t->offset = offset;
+    t->ndim = ndim;
+    t->size = 1;
+    for (size_t i = 0; i < ndim; i++) {
+        t->shape[i] = shape[i];
+        t->strides[i] = strides[i];
+        t->size *= shape[i];
+    }
+    t->dtype = src->dtype;
+    t->item_size = src->item_size;
+    t->device = src->device;
+    t->device_id = src->device_id;
+    t->layout = src->layout;
+    t->owns_data = 0;
+    t->backend_handle = NULL;
+    t->data = (unsigned char*)src->storage->data + offset * t->item_size;
+    return t;
+}
+
+ArixTensor* arix_tensor_narrow(const ArixTensor* src, size_t dim, size_t start, size_t size) {
+    if (!src || dim >= src->ndim || start + size > src->shape[dim]) return NULL;
+    size_t new_shape[16], new_strides[16];
+    for (size_t i = 0; i < src->ndim; i++) {
+        new_shape[i] = src->shape[i];
+        new_strides[i] = src->strides[i];
+    }
+    new_shape[dim] = size;
+    size_t offset = src->offset + start * src->strides[dim];
+    return arix_tensor_as_strided(src, offset, new_shape, src->ndim, new_strides);
+}
+
+/* ===== Backward-compat: ensure storage exists for legacy code paths ===== */
+static ArixStorage* ensure_storage(ArixTensor* t) {
+    if (!t->storage) {
+        size_t nb = t->size * t->item_size;
+        t->storage = arix_storage_create(nb);
+        if (t->storage && t->data) {
+            memcpy(t->storage->data, t->data, nb);
+            /* keep data pointing to storage */
+            t->data = t->storage->data;
+            t->offset = 0;
+        }
+    }
+    return t->storage;
+}
+
 static void arix_tensor_fill_scalar(ArixTensor* t, double value) {
     unsigned char* data = (unsigned char*)t->data;
     size_t n = t->size;
@@ -71,6 +167,8 @@ ArixTensor* arix_tensor_create(const size_t* shape, size_t ndim, ArixDtype dtype
     tensor->layout = ARIX_LAYOUT_ROW_MAJOR;
     tensor->owns_data = 1;
     tensor->backend_handle = NULL;
+    tensor->storage = NULL;
+    tensor->offset = 0;
 
     size_t safe_ndim = ndim > 0 ? ndim : 1;
     tensor->shape = (size_t*)aligned_alloc_wrapper(safe_ndim * sizeof(size_t), 64);
@@ -96,24 +194,25 @@ ArixTensor* arix_tensor_create(const size_t* shape, size_t ndim, ArixDtype dtype
         stride *= shape[i - 1];
     }
 
-    tensor->data = aligned_alloc_wrapper(total * tensor->item_size, 64);
-    if (!tensor->data) {
+    size_t num_bytes = total * tensor->item_size;
+    tensor->storage = arix_storage_create(num_bytes);
+    if (!tensor->storage) {
         arix_free(tensor->shape, ndim * sizeof(size_t));
         arix_free(tensor->strides, ndim * sizeof(size_t));
         arix_free(tensor, sizeof(ArixTensor));
         return NULL;
     }
+    tensor->data = tensor->storage->data;
 
     return tensor;
 }
 
 void arix_tensor_destroy(ArixTensor* tensor) {
     if (!tensor) return;
-    if (tensor->owns_data) {
-        arix_free(tensor->data, tensor->size * tensor->item_size);
-    }
-    arix_free(tensor->shape, tensor->ndim * sizeof(size_t));
-    arix_free(tensor->strides, tensor->ndim * sizeof(size_t));
+    arix_storage_release(tensor->storage);
+    size_t ndim = tensor->ndim > 0 ? tensor->ndim : 1;
+    arix_free(tensor->shape, ndim * sizeof(size_t));
+    arix_free(tensor->strides, ndim * sizeof(size_t));
     arix_free(tensor, sizeof(ArixTensor));
 }
 
@@ -322,40 +421,7 @@ ArixTensor* arix_tensor_clone(const ArixTensor* src) {
 
 ArixTensor* arix_tensor_slice(const ArixTensor* src, size_t dim, size_t start, size_t end) {
     if (!src || dim >= src->ndim || start >= end || end > src->shape[dim]) return NULL;
-    size_t new_ndim = src->ndim;
-    size_t* new_shape = (size_t*)aligned_alloc_wrapper(new_ndim * sizeof(size_t), 64);
-    if (!new_shape) return NULL;
-    size_t new_size = 1;
-    for (size_t i = 0; i < new_ndim; i++) {
-        new_shape[i] = (i == dim) ? (end - start) : src->shape[i];
-        new_size *= new_shape[i];
-    }
-    ArixTensor* result = arix_tensor_empty(new_shape, new_ndim, src->dtype);
-    arix_free(new_shape, new_ndim * sizeof(size_t));
-    if (!result) return NULL;
-    size_t* src_indices = (size_t*)aligned_alloc_wrapper(src->ndim * sizeof(size_t), 64);
-    if (!src_indices) { arix_tensor_destroy(result); return NULL; }
-    memset(src_indices, 0, src->ndim * sizeof(size_t));
-    unsigned char* src_data = (unsigned char*)src->data;
-    unsigned char* dst_data = (unsigned char*)result->data;
-    size_t item_size = src->item_size;
-    size_t dst_idx = 0;
-    for (size_t flat = 0; flat < src->size; flat++) {
-        size_t tmp = flat;
-        for (size_t i = 0; i < src->ndim; i++) {
-            size_t dim_stride = src->strides[i];
-            size_t dim_size = src->shape[i];
-            src_indices[i] = (dim_stride > 0) ? (tmp / dim_stride) % dim_size : 0;
-            if (dim_stride > 0) tmp = tmp % dim_stride;
-        }
-        if (src_indices[dim] >= start && src_indices[dim] < end) {
-            size_t offset = compute_offset(src, src_indices);
-            memcpy(dst_data + dst_idx * item_size, src_data + offset * item_size, item_size);
-            dst_idx++;
-        }
-    }
-    arix_free(src_indices, src->ndim * sizeof(size_t));
-    return result;
+    return arix_tensor_narrow(src, dim, start, end - start);
 }
 
 ArixTensor* arix_tensor_reshape(const ArixTensor* src, const size_t* new_shape, size_t new_ndim) {
@@ -373,6 +439,15 @@ ArixTensor* arix_tensor_reshape(const ArixTensor* src, const size_t* new_shape, 
     for (size_t i = 0; i < new_ndim; i++) {
         resolved_shape[i] = (i == auto_idx) ? (src->size / new_size) : new_shape[i];
     }
+    if (arix_tensor_is_contiguous(src) && src->ndim > 0) {
+        size_t new_strides[16];
+        size_t stride = 1;
+        for (size_t i = new_ndim; i > 0; i--) {
+            new_strides[i - 1] = stride;
+            stride *= resolved_shape[i - 1];
+        }
+        return arix_tensor_as_strided(src, src->offset, resolved_shape, new_ndim, new_strides);
+    }
     ArixTensor* result = arix_tensor_empty(resolved_shape, new_ndim, src->dtype);
     if (!result) return NULL;
     memcpy(result->data, src->data, src->size * src->item_size);
@@ -381,26 +456,12 @@ ArixTensor* arix_tensor_reshape(const ArixTensor* src, const size_t* new_shape, 
 
 ArixTensor* arix_tensor_permute(const ArixTensor* src, const size_t* axes) {
     if (!src) return NULL;
-    size_t* new_shape = (size_t*)aligned_alloc_wrapper(src->ndim * sizeof(size_t), 64);
-    size_t* new_strides = (size_t*)aligned_alloc_wrapper(src->ndim * sizeof(size_t), 64);
-    if (!new_shape || !new_strides) {
-        arix_free(new_shape, src->ndim * sizeof(size_t));
-        arix_free(new_strides, src->ndim * sizeof(size_t));
-        return NULL;
-    }
+    size_t new_shape[16], new_strides[16];
     for (size_t i = 0; i < src->ndim; i++) {
         new_shape[i] = src->shape[axes[i]];
         new_strides[i] = src->strides[axes[i]];
     }
-    ArixTensor* result = arix_tensor_empty(new_shape, src->ndim, src->dtype);
-    if (!result) { arix_free(new_shape, src->ndim * sizeof(size_t)); arix_free(new_strides, src->ndim * sizeof(size_t)); return NULL; }
-    for (size_t i = 0; i < src->ndim; i++) {
-        result->strides[i] = new_strides[i];
-    }
-    memcpy(result->data, src->data, src->size * src->item_size);
-    arix_free(new_shape, src->ndim * sizeof(size_t));
-    arix_free(new_strides, src->ndim * sizeof(size_t));
-    return result;
+    return arix_tensor_as_strided(src, src->offset, new_shape, src->ndim, new_strides);
 }
 
 ArixTensor* arix_tensor_expand(const ArixTensor* src, const size_t* new_shape, size_t new_ndim) {
@@ -437,23 +498,34 @@ ArixTensor* arix_tensor_expand(const ArixTensor* src, const size_t* new_shape, s
 ArixTensor* arix_tensor_squeeze(const ArixTensor* src, size_t dim) {
     if (!src || dim >= src->ndim || src->shape[dim] != 1) return arix_tensor_copy(src);
     size_t new_ndim = src->ndim - 1;
-    size_t new_shape[16];
+    size_t new_shape[16], new_strides[16];
     size_t j = 0;
     for (size_t i = 0; i < src->ndim; i++) {
-        if (i != dim) { new_shape[j++] = src->shape[i]; }
+        if (i != dim) {
+            new_shape[j] = src->shape[i];
+            new_strides[j] = src->strides[i];
+            j++;
+        }
     }
-    return arix_tensor_reshape(src, new_shape, new_ndim);
+    return arix_tensor_as_strided(src, src->offset, new_shape, new_ndim, new_strides);
 }
 
 ArixTensor* arix_tensor_unsqueeze(const ArixTensor* src, size_t dim) {
     if (!src || dim > src->ndim) return NULL;
     size_t new_ndim = src->ndim + 1;
-    size_t new_shape[16];
+    size_t new_shape[16], new_strides[16];
     size_t j = 0;
     for (size_t i = 0; i < new_ndim; i++) {
-        new_shape[i] = (i == dim) ? 1 : src->shape[j++];
+        if (i == dim) {
+            new_shape[i] = 1;
+            new_strides[i] = 0;
+        } else {
+            new_shape[i] = src->shape[j];
+            new_strides[i] = src->strides[j];
+            j++;
+        }
     }
-    return arix_tensor_reshape(src, new_shape, new_ndim);
+    return arix_tensor_as_strided(src, src->offset, new_shape, new_ndim, new_strides);
 }
 
 ArixTensor* arix_tensor_concat(const ArixTensor** tensors, size_t num_tensors, size_t dim) {
@@ -753,15 +825,22 @@ ArixTensor* arix_tensor_load(const char* path) {
     return tensor;
 }
 
+/* Forward declaration of contiguity helper */
+static const ArixTensor* tensor_prep_contiguous(const ArixTensor* src, ArixTensor** out);
+
 static ArixTensor* compare_op(const ArixTensor* a, const ArixTensor* b, int (*cmp)(float, float)) {
     if (!a || !b) return NULL;
+    ArixTensor* ta = NULL, *tb = NULL;
+    a = tensor_prep_contiguous(a, &ta);
+    b = tensor_prep_contiguous(b, &tb);
     size_t n = a->size < b->size ? a->size : b->size;
     ArixTensor* result = arix_tensor_empty(a->shape, a->ndim, ARIX_BOOL);
-    if (!result) return NULL;
+    if (!result) { if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); return NULL; }
     float* ad = (float*)a->data;
     float* bd = (float*)b->data;
     uint8_t* rd = (uint8_t*)result->data;
     for (size_t i = 0; i < n; i++) rd[i] = cmp(ad[i], bd[i]) ? 1 : 0;
+    if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb);
     return result;
 }
 
@@ -779,11 +858,33 @@ ArixTensor* arix_tensor_le(const ArixTensor* a, const ArixTensor* b) { return co
 ArixTensor* arix_tensor_gt(const ArixTensor* a, const ArixTensor* b) { return compare_op(a, b, cmp_gt); }
 ArixTensor* arix_tensor_ge(const ArixTensor* a, const ArixTensor* b) { return compare_op(a, b, cmp_ge); }
 
+/* Helper: binary op with contiguity support */
+#define BINARY_OP_F32(name, body) \
+ArixTensor* arix_tensor_##name(const ArixTensor* a, const ArixTensor* b) { \
+    if (!a || !b) return NULL; \
+    ArixTensor* ta = NULL, *tb = NULL; \
+    a = tensor_prep_contiguous(a, &ta); \
+    b = tensor_prep_contiguous(b, &tb); \
+    size_t sz = a->size < b->size ? a->size : b->size; \
+    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32); \
+    if (!result) { if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); return NULL; } \
+    float* rd = (float*)result->data; \
+    float* ad = (float*)a->data; \
+    float* bd = (float*)b->data; \
+    for (size_t i = 0; i < sz; i++) { body; } \
+    if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); \
+    return result; \
+}
+
+/* add has broadcasting support */
 ArixTensor* arix_tensor_add(const ArixTensor* a, const ArixTensor* b) {
     if (!a || !b) return NULL;
+    ArixTensor* ta = NULL, *tb = NULL;
+    a = tensor_prep_contiguous(a, &ta);
+    b = tensor_prep_contiguous(b, &tb);
     size_t sz = a->size < b->size ? a->size : b->size;
     ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
+    if (!result) { if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); return NULL; }
     float* rd = (float*)result->data;
     float* ad = (float*)a->data;
     float* bd = (float*)b->data;
@@ -791,91 +892,40 @@ ArixTensor* arix_tensor_add(const ArixTensor* a, const ArixTensor* b) {
         for (size_t i = 0; i < sz; i++) rd[i] = ad[i] + bd[i];
     } else {
         size_t last = a->shape[a->ndim - 1];
-        for (size_t i = 0; i < a->size; i++)
-            rd[i] = ad[i] + bd[i % last];
+        for (size_t i = 0; i < a->size; i++) rd[i] = ad[i] + bd[i % last];
     }
+    if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb);
     return result;
 }
+BINARY_OP_F32(sub, rd[i] = ad[i] - bd[i])
+BINARY_OP_F32(mul, rd[i] = ad[i] * bd[i])
+BINARY_OP_F32(div, rd[i] = ad[i] / (bd[i] + 1e-10f))
+BINARY_OP_F32(minimum, rd[i] = ad[i] < bd[i] ? ad[i] : bd[i])
+BINARY_OP_F32(maximum, rd[i] = ad[i] > bd[i] ? ad[i] : bd[i])
+BINARY_OP_F32(pow, rd[i] = powf(ad[i], bd[i]))
 
-ArixTensor* arix_tensor_sub(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = ad[i] - bd[i];
-    return result;
-}
-
-ArixTensor* arix_tensor_mul(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = ad[i] * bd[i];
-    return result;
-}
-
-ArixTensor* arix_tensor_div(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = ad[i] / (bd[i] + 1e-10f);
-    return result;
-}
-
-ArixTensor* arix_tensor_minimum(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = ad[i] < bd[i] ? ad[i] : bd[i];
-    return result;
-}
-
-ArixTensor* arix_tensor_maximum(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = ad[i] > bd[i] ? ad[i] : bd[i];
-    return result;
-}
-
-ArixTensor* arix_tensor_pow(const ArixTensor* a, const ArixTensor* b) {
-    if (!a || !b) return NULL;
-    size_t sz = a->size < b->size ? a->size : b->size;
-    ArixTensor* result = arix_tensor_create(a->shape, a->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
-    float* rd = (float*)result->data;
-    float* ad = (float*)a->data;
-    float* bd = (float*)b->data;
-    for (size_t i = 0; i < sz; i++) rd[i] = powf(ad[i], bd[i]);
-    return result;
+/* ===== Contiguity helper =====
+ * If src is non-contiguous, creates a contiguous copy and returns it via *out.
+ * The caller must destroy *out after use (if non-NULL).
+ * Returns a pointer usable for flat-indexed access (either src or the copy).
+ */
+static const ArixTensor* tensor_prep_contiguous(const ArixTensor* src, ArixTensor** out) {
+    *out = NULL;
+    if (!src || arix_tensor_is_contiguous(src)) return src;
+    *out = arix_tensor_contiguous(src);
+    return *out ? *out : src;
 }
 
 static ArixTensor* unary_op_f32(const ArixTensor* src, float (*op)(float)) {
     if (!src) return NULL;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     ArixTensor* result = arix_tensor_create(src->shape, src->ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
+    if (!result) { if (tmp) arix_tensor_destroy(tmp); return NULL; }
     float* sd = (float*)src->data;
     float* rd = (float*)result->data;
     for (size_t i = 0; i < src->size; i++) rd[i] = op(sd[i]);
+    if (tmp) arix_tensor_destroy(tmp);
     return result;
 }
 
@@ -904,11 +954,13 @@ ArixTensor* arix_tensor_tanh(const ArixTensor* src) { return unary_op_f32(src, t
 
 ArixTensor* arix_tensor_sum(const ArixTensor* src, size_t dim) {
     if (!src || dim >= src->ndim) return NULL;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     size_t out_ndim = src->ndim;
     size_t out_shape[16];
     for (size_t i = 0; i < src->ndim; i++) out_shape[i] = (i == dim) ? 1 : src->shape[i];
     ArixTensor* result = arix_tensor_zeros(out_shape, out_ndim, ARIX_FLOAT32);
-    if (!result) return NULL;
+    if (!result) { if (tmp) arix_tensor_destroy(tmp); return NULL; }
     float* sd = (float*)src->data;
     float* rd = (float*)result->data;
     size_t inner = 1, outer = 1, reduce = src->shape[dim];
@@ -921,6 +973,7 @@ ArixTensor* arix_tensor_sum(const ArixTensor* src, size_t dim) {
             }
         }
     }
+    if (tmp) arix_tensor_destroy(tmp);
     return result;
 }
 
@@ -936,13 +989,15 @@ ArixTensor* arix_tensor_mean(const ArixTensor* src, size_t dim) {
 
 ArixTensor* arix_tensor_var(const ArixTensor* src, size_t dim) {
     if (!src || dim >= src->ndim) return NULL;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     ArixTensor* mean = arix_tensor_mean(src, dim);
-    if (!mean) return NULL;
+    if (!mean) { if (tmp) arix_tensor_destroy(tmp); return NULL; }
     size_t inner = 1, outer = 1, reduce = src->shape[dim];
     for (size_t i = 0; i < dim; i++) outer *= src->shape[i];
     for (size_t i = dim + 1; i < src->ndim; i++) inner *= src->shape[i];
     ArixTensor* result = arix_tensor_zeros(mean->shape, mean->ndim, ARIX_FLOAT32);
-    if (!result) { arix_tensor_destroy(mean); return NULL; }
+    if (!result) { arix_tensor_destroy(mean); if (tmp) arix_tensor_destroy(tmp); return NULL; }
     float* sd = (float*)src->data;
     float* md = (float*)mean->data;
     float* rd = (float*)result->data;
@@ -957,6 +1012,7 @@ ArixTensor* arix_tensor_var(const ArixTensor* src, size_t dim) {
     float inv_n = 1.0f / (float)reduce;
     for (size_t i = 0; i < result->size; i++) rd[i] *= inv_n;
     arix_tensor_destroy(mean);
+    if (tmp) arix_tensor_destroy(tmp);
     return result;
 }
 
@@ -970,33 +1026,45 @@ ArixTensor* arix_tensor_std(const ArixTensor* src, size_t dim) {
 
 float arix_tensor_min(const ArixTensor* src) {
     if (!src || src->size == 0) return 0.0f;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     float* d = (float*)src->data;
     float val = d[0];
     for (size_t i = 1; i < src->size; i++) if (d[i] < val) val = d[i];
+    if (tmp) arix_tensor_destroy(tmp);
     return val;
 }
 
 float arix_tensor_max(const ArixTensor* src) {
     if (!src || src->size == 0) return 0.0f;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     float* d = (float*)src->data;
     float val = d[0];
     for (size_t i = 1; i < src->size; i++) if (d[i] > val) val = d[i];
+    if (tmp) arix_tensor_destroy(tmp);
     return val;
 }
 
 size_t arix_tensor_argmin(const ArixTensor* src) {
     if (!src || src->size == 0) return 0;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     float* d = (float*)src->data;
     size_t idx = 0;
     for (size_t i = 1; i < src->size; i++) if (d[i] < d[idx]) idx = i;
+    if (tmp) arix_tensor_destroy(tmp);
     return idx;
 }
 
 size_t arix_tensor_argmax(const ArixTensor* src) {
     if (!src || src->size == 0) return 0;
+    ArixTensor* tmp = NULL;
+    src = tensor_prep_contiguous(src, &tmp);
     float* d = (float*)src->data;
     size_t idx = 0;
     for (size_t i = 1; i < src->size; i++) if (d[i] > d[idx]) idx = i;
+    if (tmp) arix_tensor_destroy(tmp);
     return idx;
 }
 
@@ -1049,11 +1117,14 @@ float arix_tensor_dot(const ArixTensor* a, const ArixTensor* b) {
 
 ArixTensor* arix_tensor_matmul(const ArixTensor* a, const ArixTensor* b) {
     if (!a || !b || a->ndim != 2 || b->ndim != 2) return NULL;
+    ArixTensor* ta = NULL, *tb = NULL;
+    a = tensor_prep_contiguous(a, &ta);
+    b = tensor_prep_contiguous(b, &tb);
     size_t m = a->shape[0], k = a->shape[1], n = b->shape[1];
-    if (k != b->shape[0]) return NULL;
+    if (k != b->shape[0]) { if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); return NULL; }
     size_t shape_c[] = {m, n};
     ArixTensor* result = arix_tensor_zeros(shape_c, 2, ARIX_FLOAT32);
-    if (!result) return NULL;
+    if (!result) { if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb); return NULL; }
     float* ad = (float*)a->data;
     float* bd = (float*)b->data;
     float* rd = (float*)result->data;
@@ -1061,6 +1132,7 @@ ArixTensor* arix_tensor_matmul(const ArixTensor* a, const ArixTensor* b) {
         for (size_t j = 0; j < n; j++)
             for (size_t l = 0; l < k; l++)
                 rd[i * n + j] += ad[i * k + l] * bd[l * n + j];
+    if (ta) arix_tensor_destroy(ta); if (tb) arix_tensor_destroy(tb);
     return result;
 }
 
@@ -1656,6 +1728,36 @@ void arix_tensor_print(const ArixTensor* tensor) {
         }
         printf("]\n");
     }
+}
+
+ArixTensor* arix_tensor_contiguous(const ArixTensor* src) {
+    if (!src) return NULL;
+    if (arix_tensor_is_contiguous(src)) {
+        arix_storage_retain(src->storage);
+        return arix_tensor_as_strided(src, src->offset, src->shape, src->ndim, src->strides);
+    }
+    ArixTensor* result = arix_tensor_create(src->shape, src->ndim, src->dtype);
+    if (!result) return NULL;
+    /* Strided copy: iterate over all indices */
+    unsigned char* dst = (unsigned char*)result->data;
+    unsigned char* src_data = (unsigned char*)src->data;
+    size_t is = src->item_size;
+    size_t* indices = (size_t*)aligned_alloc_wrapper(src->ndim * sizeof(size_t), 64);
+    if (!indices) { arix_tensor_destroy(result); return NULL; }
+    memset(indices, 0, src->ndim * sizeof(size_t));
+    for (size_t flat = 0; flat < src->size; flat++) {
+        size_t tmp = flat;
+        for (size_t i = src->ndim; i > 0; i--) {
+            indices[i - 1] = (src->strides[i - 1] > 0) ? (tmp / src->strides[i - 1]) % src->shape[i - 1] : 0;
+            if (src->strides[i - 1] > 0) tmp %= src->strides[i - 1];
+        }
+        size_t offset = 0;
+        for (size_t i = 0; i < src->ndim; i++)
+            offset += indices[i] * src->strides[i];
+        memcpy(dst + flat * is, src_data + offset * is, is);
+    }
+    arix_free(indices, src->ndim * sizeof(size_t));
+    return result;
 }
 
 size_t arix_tensor_dtype_size(ArixDtype dtype) {

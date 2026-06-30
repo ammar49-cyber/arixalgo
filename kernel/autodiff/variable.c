@@ -12,9 +12,12 @@ ArixVariable* arix_variable_create(ArixTensor* data, int requires_grad) {
     var->backward_fn = NULL;
     var->backward_ctx = NULL;
     var->free_ctx = NULL;
+    var->recompute_ctx = NULL;
+    var->checkpointed = 0;
     var->ref_count = 0;
     var->parents = NULL;
     var->num_parents = 0;
+    var->param_count = 0;
     return var;
 }
 

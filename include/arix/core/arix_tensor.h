@@ -41,8 +41,20 @@ typedef enum {
     ARIX_DEVICE_NPU,
 } ArixDevice;
 
+typedef struct ArixStorage {
+    void* data;               /* raw data buffer */
+    size_t num_bytes;         /* total bytes allocated */
+    int ref_count;            /* how many tensors reference this storage */
+} ArixStorage;
+
+ArixStorage* arix_storage_create(size_t num_bytes);
+void         arix_storage_retain(ArixStorage* s);
+void         arix_storage_release(ArixStorage* s);
+
 typedef struct {
-    void* data;
+    ArixStorage* storage;     /* ref-counted storage (NULL for unmanaged) */
+    void* data;               /* convenience pointer: storage->data + offset * item_size */
+    size_t offset;            /* element offset into storage->data */
     size_t* shape;
     size_t* strides;
     size_t ndim;
@@ -90,6 +102,9 @@ ArixTensor* arix_tensor_permute(const ArixTensor* src, const size_t* axes);
 ArixTensor* arix_tensor_expand(const ArixTensor* src, const size_t* new_shape, size_t new_ndim);
 ArixTensor* arix_tensor_squeeze(const ArixTensor* src, size_t dim);
 ArixTensor* arix_tensor_unsqueeze(const ArixTensor* src, size_t dim);
+ArixTensor* arix_tensor_contiguous(const ArixTensor* src);
+ArixTensor* arix_tensor_as_strided(const ArixTensor* src, size_t offset, const size_t* shape, size_t ndim, const size_t* strides);
+ArixTensor* arix_tensor_narrow(const ArixTensor* src, size_t dim, size_t start, size_t size);
 
 ArixTensor* arix_tensor_concat(const ArixTensor** tensors, size_t num_tensors, size_t dim);
 ArixTensor** arix_tensor_split(const ArixTensor* src, size_t num_splits, size_t dim);

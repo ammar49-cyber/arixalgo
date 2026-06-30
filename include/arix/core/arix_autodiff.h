@@ -6,22 +6,29 @@
 
 typedef void (*BackwardFn)(void* ctx, ArixTensor* grad_output);
 
+typedef void* (*RecomputeCtxFn)(struct ArixVariable* var, size_t* params, size_t param_count);
+
 typedef struct ArixVariable {
     ArixTensor* data;
     ArixTensor* grad;
     int requires_grad;
+    int checkpointed;
     BackwardFn backward_fn;
     void* backward_ctx;
     void (*free_ctx)(void*);
+    RecomputeCtxFn recompute_ctx;
     int ref_count;
     struct ArixVariable** parents;
     size_t num_parents;
+    size_t params[8];
+    size_t param_count;
 } ArixVariable;
 
 typedef struct {
     ArixVariable** vars;
     size_t num_vars;
     size_t capacity;
+    int checkpointing;
 } ArixTape;
 
 ArixVariable* arix_variable_create(ArixTensor* data, int requires_grad);
@@ -44,6 +51,9 @@ void      arix_tape_clip_grad_norm(ArixTape* tape, float max_norm);
 void  arix_no_grad_enter(void);
 void  arix_no_grad_exit(void);
 int   arix_no_grad_is_active(void);
+
+void  arix_tape_checkpoint_begin(ArixTape* tape);
+void  arix_tape_checkpoint_end(ArixTape* tape);
 
 ArixVariable* arix_add(ArixTape* tape, ArixVariable* a, ArixVariable* b);
 ArixVariable* arix_sub(ArixTape* tape, ArixVariable* a, ArixVariable* b);
