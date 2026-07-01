@@ -64,6 +64,7 @@ static void test_ser_train_step(void) {
 
 static void test_ser_train_convergence(void) {
     ArixArchConfig arch_cfg = arix_arch_config_default();
+    arch_cfg.enable_attention = 0;
     arch_cfg.hss_config.num_layers = 0;
     arch_cfg.hss_config.input_dim = 0;
     arch_cfg.ser_config.input_dim = 4;
@@ -71,6 +72,7 @@ static void test_ser_train_convergence(void) {
     arch_cfg.ser_config.expert_dim = 8;
     arch_cfg.ser_config.num_experts = 4;
     arch_cfg.ser_config.num_active = 2;
+    arch_cfg.enable_ser = 1;
     arch_cfg.input_dim = 4;
     arch_cfg.output_dim = 4;
 

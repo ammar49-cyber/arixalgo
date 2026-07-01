@@ -18,6 +18,7 @@ static void run_test(const char* name, void (*fn)(void)) {
 static void test_trainer_create(void) {
     ArixArchConfig arch_cfg = arix_arch_config_default();
     arch_cfg.input_dim = 8; arch_cfg.output_dim = 8;
+    arch_cfg.enable_attention = 0;
     arch_cfg.hss_config.input_dim = 8; arch_cfg.hss_config.output_dim = 8;
     arch_cfg.hss_config.state_dim = 4;
     arch_cfg.ser_config.input_dim = 8; arch_cfg.ser_config.output_dim = 8;
@@ -69,6 +70,7 @@ static int try_train_step(ArixArchConfig* cfg, unsigned int attempt, float* loss
 static void test_train_step(void) {
     ArixArchConfig arch_cfg = arix_arch_config_default();
     arch_cfg.input_dim = 8; arch_cfg.output_dim = 8;
+    arch_cfg.enable_attention = 0;
     arch_cfg.hss_config.input_dim = 8; arch_cfg.hss_config.output_dim = 8;
     arch_cfg.hss_config.state_dim = 4;
     arch_cfg.ser_config.input_dim = 8; arch_cfg.ser_config.output_dim = 8;
@@ -110,6 +112,7 @@ static int try_evaluate(ArixArchConfig* cfg, unsigned int attempt, float* loss_o
 static void test_evaluate(void) {
     ArixArchConfig arch_cfg = arix_arch_config_default();
     arch_cfg.input_dim = 8; arch_cfg.output_dim = 8;
+    arch_cfg.enable_attention = 0;
     arch_cfg.hss_config.input_dim = 8; arch_cfg.hss_config.output_dim = 8;
     arch_cfg.hss_config.state_dim = 4;
     arch_cfg.ser_config.input_dim = 8; arch_cfg.ser_config.output_dim = 8;
@@ -129,6 +132,7 @@ static void test_evaluate(void) {
 static void test_checkpoint(void) {
     ArixArchConfig arch_cfg = arix_arch_config_default();
     arch_cfg.input_dim = 8; arch_cfg.output_dim = 8;
+    arch_cfg.enable_attention = 0;
     arch_cfg.hss_config.input_dim = 8; arch_cfg.hss_config.output_dim = 8;
     arch_cfg.hss_config.state_dim = 4;
     arch_cfg.ser_config.input_dim = 8; arch_cfg.ser_config.output_dim = 8;

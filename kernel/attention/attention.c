@@ -448,22 +448,88 @@ int arix_attn_build_train_graph(ArixAttentionWeights* w, ArixTape* tape,
 
     size_t D = w->config.d_model, H = w->config.num_heads, hd = w->config.head_dim;
     size_t B = input_var->data->shape[0], S = input_var->data->shape[1];
+    size_t dk = H * hd;
 
-    /* Q = x @ W_q + b_q */
-    ArixVariable* q = arix_matmul(tape, input_var, wq_v);
-    /* K, V similarly */
-    ArixVariable* k = arix_matmul(tape, input_var, wk_v);
-    ArixVariable* v = arix_matmul(tape, input_var, wv_v);
+    /* Flatten input: [B, S, D] -> [B*S, D] */
+    size_t flat_sh[] = {B * S, D};
+    ArixVariable* x_flat = arix_reshape(tape, input_var, flat_sh, 2);
 
-    /* Reshape to [B, H, S, hd] */
-    size_t qkv_sh[] = {B, H, S, hd};
-    /* Use transpose as a view-like op to rearrange */
-    ArixVariable* q_r = arix_transpose(tape, q, 0, 1);
-    /* Actually for reshape we need proper view support... */
-    /* For now, use basic ops: reshape is a view, handled by tape */
+    /* Q, K, V projections: [B*S, D] @ [D, dk] -> [B*S, dk] */
+    ArixVariable* q_flat = arix_matmul(tape, x_flat, wq_v);
+    ArixVariable* k_flat = arix_matmul(tape, x_flat, wk_v);
+    ArixVariable* v_flat = arix_matmul(tape, x_flat, wv_v);
 
-    /* Simplified: produce dummy output for integration testing */
-    ArixVariable* result = arix_add(tape, q, k);
-    *output_var = result;
+    /* Unflatten Q, K, V: [B*S, dk] -> [B, S, dk] */
+    size_t unflat_sh[] = {B, S, dk};
+    ArixVariable* q_3d = arix_reshape(tape, q_flat, unflat_sh, 3);
+    ArixVariable* k_3d = arix_reshape(tape, k_flat, unflat_sh, 3);
+    ArixVariable* v_3d = arix_reshape(tape, v_flat, unflat_sh, 3);
+
+    /* Reshape to [B, H, S, hd]: first [B, S, H, hd] then transpose */
+    size_t bshh_sh[] = {B, S, H, hd};
+    size_t bhhs_sh[] = {B, H, S, hd};
+    ArixVariable* q_bshh = arix_reshape(tape, q_3d, bshh_sh, 4);
+    ArixVariable* k_bshh = arix_reshape(tape, k_3d, bshh_sh, 4);
+    ArixVariable* v_bshh = arix_reshape(tape, v_3d, bshh_sh, 4);
+    ArixVariable* q_bhhs = arix_transpose(tape, q_bshh, 1, 2);
+    ArixVariable* k_bhhs = arix_transpose(tape, k_bshh, 1, 2);
+    ArixVariable* v_bhhs = arix_transpose(tape, v_bshh, 1, 2);
+
+    /* RoPE (skip for training graph — can enable via separate op later) */
+    (void)cos; (void)sin;
+
+    /* Flatten batch+head dims for matmul: [B, H, S, hd] -> [B*H, S, hd] */
+    size_t bh_sh[] = {B * H, S, hd};
+    ArixVariable* q_2d = arix_reshape(tape, q_bhhs, bh_sh, 3);
+    ArixVariable* k_2d = arix_reshape(tape, k_bhhs, bh_sh, 3);
+    ArixVariable* v_2d = arix_reshape(tape, v_bhhs, bh_sh, 3);
+
+    /* scores = Q @ K^T: [B*H, S, hd] @ [B*H, hd, S] -> [B*H, S, S] */
+    size_t kt_sh[] = {B * H, hd, S};
+    ArixVariable* k_t = arix_reshape(tape, k_2d, kt_sh, 3);
+    ArixVariable* k_t_t = arix_transpose(tape, k_t, 1, 2);
+    ArixVariable* scores = arix_matmul(tape, q_2d, k_t_t);
+
+    /* Scale */
+    float scale = 1.0f / sqrtf((float)hd);
+    size_t one_s[] = {1};
+    ArixTensor* scale_t = arix_tensor_ones(one_s, 1, ARIX_FLOAT32);
+    if (!scale_t) return -1;
+    ((float*)scale_t->data)[0] = scale;
+    ArixVariable* scale_v = arix_variable_create(scale_t, 0);
+    arix_tape_record(tape, scale_v);
+    scores = arix_mul(tape, scores, scale_v);
+
+    /* Causal mask */
+    if (w->config.use_causal_mask && S > 1) {
+        size_t mask_sh[] = {1, S, S};
+        ArixTensor* mask_t = arix_tensor_create(mask_sh, 3, ARIX_FLOAT32);
+        if (!mask_t) return -1;
+        float* md = (float*)mask_t->data;
+        for (size_t i = 0; i < S; i++)
+            for (size_t j = 0; j < S; j++)
+                md[i * S + j] = (j <= i) ? 0.0f : -1e9f;
+        ArixVariable* mask_v = arix_variable_create(mask_t, 0);
+        arix_tape_record(tape, mask_v);
+        scores = arix_add(tape, scores, mask_v);
+    }
+
+    /* Softmax over last dim */
+    ArixVariable* attn = arix_softmax(tape, scores, 2);
+
+    /* attn @ V: [B*H, S, S] @ [B*H, S, hd] -> [B*H, S, hd] */
+    size_t v_mm_sh[] = {B * H, S, hd};
+    ArixVariable* v_mm = arix_reshape(tape, v_2d, v_mm_sh, 3);
+    ArixVariable* ctx = arix_matmul(tape, attn, v_mm);
+
+    /* Reshape back: [B*H, S, hd] -> [B, H, S, hd] -> [B, S, H, hd] -> [B, S, dk] */
+    ArixVariable* ctx_bhhs = arix_reshape(tape, ctx, bhhs_sh, 4);
+    ArixVariable* ctx_bshh = arix_transpose(tape, ctx_bhhs, 1, 2);
+    ArixVariable* ctx_3d = arix_reshape(tape, ctx_bshh, unflat_sh, 3);
+
+    /* Output projection: [B, S, dk] @ [dk, D] -> [B, S, D] */
+    ArixVariable* out_3d = arix_matmul(tape, ctx_3d, wo_v);
+
+    *output_var = out_3d;
     return 0;
 }

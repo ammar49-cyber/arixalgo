@@ -2,6 +2,7 @@
 #include "automatic_differentiation_framework.h"
 #include "polymorphic_memory_allocator.h"
 #include "system_architecture_definitions.h"
+#include "multi_head_attention_module.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -89,7 +90,43 @@ float arix_trainer_train_step(ArixTrainer* trainer, const ArixTensor* batch_inpu
 
     ArixVariable* outv = NULL;
     int ret = -1;
-    if (trainer->model->hss_model && trainer->model->hss_model->config.num_layers > 0) {
+    if (trainer->model->attention && trainer->model->embed_weight) {
+        /* Use the 3D input directly for attention */
+        ArixTensor* inv_3d = (ArixTensor*)batch_input;
+        if (inv_3d->ndim == 3) {
+            arix_variable_destroy(inv);
+            inv_t = arix_tensor_create(inv_3d->shape, 3, ARIX_FLOAT32);
+            memcpy(inv_t->data, inv_3d->data, inv_3d->size * sizeof(float));
+            inv = arix_variable_create(inv_t, 0);
+        }
+        /* Embedding lookup */
+        size_t input_shape[] = {batch_input->shape[0], batch_input->shape[1]};
+        ArixTensor* idx_t = arix_tensor_create(input_shape, 2, ARIX_INT32);
+        if (!idx_t) return -1.0f;
+        int* id = (int*)idx_t->data;
+        float* fd = (float*)inv->data;
+        size_t n = batch_input->shape[0] * batch_input->shape[1];
+        for (size_t i = 0; i < n; i++) id[i] = (int)fd[i];
+        ArixVariable* idx_v = arix_variable_create(idx_t, 0);
+        arix_tape_record(tape, idx_v);
+        ArixVariable* emb = arix_embedding(tape, wv[nw - 2], idx_v);
+
+        /* Attention params: 0-7 are attention, nw-2 is embed, nw-1 is unembed */
+        ArixTensor* cos_t = arix_rope_precompute(batch_input->shape[1],
+            trainer->model->attention->config.head_dim,
+            trainer->model->attention->config.rope_base);
+        ArixTensor* sin_t = arix_tensor_copy(cos_t); /* reuse cos for sin in training graph */
+        ret = arix_attn_build_train_graph(trainer->model->attention, tape, emb,
+                                           wv, 8, &outv, cos_t, sin_t);
+        arix_tensor_destroy(cos_t); arix_tensor_destroy(sin_t);
+
+        /* Unembed to vocab logits */
+        if (ret == 0 && outv && nw > 8) {
+            size_t outf_sh[] = {outv->data->shape[0] * outv->data->shape[1], outv->data->shape[2]};
+            ArixVariable* outf = arix_reshape(tape, outv, outf_sh, 2);
+            outv = arix_matmul(tape, outf, wv[nw - 1]);
+        }
+    } else if (trainer->model->hss_model && trainer->model->hss_model->config.num_layers > 0) {
         ret = arix_hss_build_train_graph(trainer->model->hss_model, tape, inv, wv, nw, &outv);
     } else if (trainer->model->ser_model && trainer->model->ser_model->num_layers > 0) {
         ret = arix_ser_build_train_graph(trainer->model->ser_model, tape, inv, wv, nw, &outv);

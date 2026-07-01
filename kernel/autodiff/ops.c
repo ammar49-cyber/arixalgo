@@ -498,6 +498,45 @@ static void backward_transpose(void* ctx, ArixTensor* grad_output) {
     grad_accum(&c->a->grad, g);
 }
 
+/* ========== Reshape ========== */
+typedef struct { ArixVariable* a; size_t orig_shape[8]; size_t orig_ndim; } ReshapeCtx;
+static void set_parents(ArixVariable* var, ArixVariable** par, size_t n);
+static void free_ctx_ReshapeCtx(void* p) { arix_free(p, sizeof(ReshapeCtx)); }
+static void* recompute_ReshapeCtx(ArixVariable* var, size_t* params, size_t n) {
+    ReshapeCtx* ctx = (ReshapeCtx*)arix_malloc(sizeof(ReshapeCtx), 64);
+    if (ctx) { ctx->a = var->parents[0]; if (n > 0) ctx->orig_ndim = n; for (size_t i = 0; i < n && i < 8; i++) ctx->orig_shape[i] = params[i]; var->free_ctx = free_ctx_ReshapeCtx; }
+    return ctx;
+}
+static void backward_reshape(void* ctx, ArixTensor* grad_output) {
+    ReshapeCtx* c = (ReshapeCtx*)ctx;
+    if (!c->a->requires_grad) return;
+    ArixTensor* g = arix_tensor_reshape(grad_output, c->orig_shape, c->orig_ndim);
+    grad_accum(&c->a->grad, g);
+}
+
+ArixVariable* arix_reshape(ArixTape* tape, ArixVariable* a, const size_t* shape, size_t ndim) {
+    int rg = requires_grad1(a);
+    if (!a || !a->data) return NULL;
+    ArixTensor* result = arix_tensor_reshape(a->data, shape, ndim);
+    if (!result) return NULL;
+    ArixVariable* var = arix_variable_create(result, rg);
+    if (!var) { arix_tensor_destroy(result); return NULL; }
+    if (rg && g_grad_enabled) {
+        ReshapeCtx* ctx = (ReshapeCtx*)arix_malloc(sizeof(ReshapeCtx), 64);
+        if (ctx) {
+            ctx->a = a; ctx->orig_ndim = a->data->ndim;
+            for (size_t i = 0; i < a->data->ndim && i < 8; i++) ctx->orig_shape[i] = a->data->shape[i];
+            var->backward_fn = backward_reshape; var->backward_ctx = ctx;
+            var->free_ctx = free_ctx_ReshapeCtx; var->recompute_ctx = recompute_ReshapeCtx;
+            for (size_t i = 0; i < a->data->ndim && i < 8; i++) var->params[i] = a->data->shape[i];
+            var->param_count = a->data->ndim;
+        }
+        set_parents(var, &a, 1);
+    }
+    if (tape && g_grad_enabled) arix_tape_record(tape, var);
+    return var;
+}
+
 typedef struct { ArixVariable* a; ArixTensor* mask; float rate; } DropoutCtx;
 static void free_ctx_DropoutCtx(void* p) {
     DropoutCtx* c = (DropoutCtx*)p;

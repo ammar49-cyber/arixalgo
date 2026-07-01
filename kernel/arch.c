@@ -86,7 +86,9 @@ ArixModel* arix_model_create(const ArixArchConfig* config) {
 
     if (config->enable_attention) {
         ArixAttentionConfig attn_cfg = config->attention_config;
-        if (attn_cfg.d_model == 0) { attn_cfg = arix_attn_config_default(); attn_cfg.d_model = in_dim; }
+        if (attn_cfg.d_model == 0) { attn_cfg = arix_attn_config_default(); }
+        attn_cfg.d_model = in_dim;
+        if (attn_cfg.head_dim == 0) attn_cfg.head_dim = in_dim / (attn_cfg.num_heads > 0 ? attn_cfg.num_heads : 1);
         model->attention = arix_attn_weights_create(attn_cfg, seed + 3);
         if (!model->attention) { arix_model_destroy(model); return NULL; }
 
