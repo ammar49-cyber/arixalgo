@@ -224,7 +224,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 ```bash
 # Clone 🧬
 git clone https://github.com/ammar49-cyber/arixalgo.git
-cd arix-algo
+cd arixalgo
 
 # Configure 🔧
 mkdir build && cd build
