@@ -354,7 +354,7 @@ model.optimizer.step()
 | [docs/api/python.md](docs/api/python.md) | Python API reference |
 | [docs/installation.md](docs/installation.md) | Platform-specific build guides |
 
-Full documentation is available at [aixsite.vercel.app](https://aixsite.vercel.app).
+Full documentation is available at [arixsite.vercel.app](https://arixsite.vercel.app).
 
 ---
 
@@ -390,7 +390,7 @@ and testing requirements.
 ## Links
 
 <p align="center">
-  <a href="https://aixsite.vercel.app"><b>Website</b></a> ·
+  <a href="https://arixsite.vercel.app"><b>Website</b></a> ·
   <a href="https://github.com/ammar49-cyber/arixalgo"><b>GitHub</b></a> ·
   <a href="https://x.com/Arixdrv"><b>Twitter / X</b></a> ·
   <a href="https://www.instagram.com/algoarix/"><b>Instagram</b></a> ·
