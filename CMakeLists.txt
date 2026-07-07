@@ -134,3 +134,82 @@ endif()
 if(ARIX_BUILD_PYTHON)
     add_subdirectory(src/python)
 endif()
+
+if(ARIX_BUILD_CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    enable_language(CUDA)
+
+    file(GLOB_RECURSE ARIX_CUDA_KERNEL_SRC algorithms/*/cuda/*.cu)
+    if(ARIX_CUDA_KERNEL_SRC)
+        add_library(neural_cuda_kernels STATIC ${ARIX_CUDA_KERNEL_SRC})
+        target_include_directories(neural_cuda_kernels PUBLIC
+            ${CMAKE_SOURCE_DIR}/include/neural_core/architecture
+            ${CMAKE_SOURCE_DIR}/include/neural_core/kernel
+            ${CMAKE_SOURCE_DIR}/include/neural_core/security
+            ${CUDAToolkit_INCLUDE_DIRS}
+        )
+        target_compile_definitions(neural_cuda_kernels PRIVATE ARIX_HAS_CUDA)
+        target_link_libraries(neural_cuda_kernels PUBLIC CUDA::cudart CUDA::cublas)
+    endif()
+
+    target_compile_definitions(neural_core_kernel PRIVATE ARIX_HAS_CUDA)
+    target_compile_definitions(neural_architecture_layer PRIVATE ARIX_HAS_CUDA)
+    target_link_libraries(neural_core_kernel PUBLIC CUDA::cudart CUDA::cublas)
+endif()
+
+file(GLOB_RECURSE ARIX_MONITOR_SRC security/monitor/*.c)
+if(ARIX_MONITOR_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_MONITOR_SRC})
+endif()
+
+file(GLOB_RECURSE ARIX_SECURITY_MEMORY_SRC security/memory/*.c)
+if(ARIX_SECURITY_MEMORY_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_SECURITY_MEMORY_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S1_SECURE_ALLOCATOR)
+endif()
+
+file(GLOB_RECURSE ARIX_C_BINDING_SRC security/c/src/*.c)
+if(ARIX_C_BINDING_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_C_BINDING_SRC})
+endif()
+
+file(GLOB_RECURSE ARIX_S4_NETWORK_SRC security/network/*.c)
+if(ARIX_S4_NETWORK_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S4_NETWORK_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S4_NETWORK_SECURITY)
+endif()
+
+file(GLOB_RECURSE ARIX_S5_AI_SRC security/ai/*.c)
+if(ARIX_S5_AI_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S5_AI_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S5_AI_SANITIZER)
+endif()
+
+file(GLOB_RECURSE ARIX_S6_UI_SRC security/ui/*.c)
+if(ARIX_S6_UI_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S6_UI_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S6_SECURITY_UI)
+endif()
+
+file(GLOB_RECURSE ARIX_S7_UPDATE_SRC security/updates/*.c)
+if(ARIX_S7_UPDATE_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S7_UPDATE_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S7_SECURE_UPDATES)
+endif()
+
+file(GLOB_RECURSE ARIX_S8_FORMAL_SRC security/formal/*.c)
+if(ARIX_S8_FORMAL_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S8_FORMAL_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S8_FORMAL_VERIFICATION)
+endif()
+
+file(GLOB_RECURSE ARIX_S9_PENTEST_SRC security/pentest/*.c)
+if(ARIX_S9_PENTEST_SRC)
+    target_sources(neural_security_c PRIVATE ${ARIX_S9_PENTEST_SRC})
+    target_compile_definitions(neural_security_c PRIVATE ARIX_S9_PENETRATION_TESTING)
+endif()
+
+file(GLOB_RECURSE ARIX_CPP_BRIDGE_SRC security/cpp/src/*.cpp)
+if(ARIX_CPP_BRIDGE_SRC)
+    target_sources(neural_security_cpp PRIVATE ${ARIX_CPP_BRIDGE_SRC})
+endif()

@@ -1,9 +1,7 @@
-/*
- * C++ Security Wrapper Implementation — SKELETON
- * VERSION: v0.5
- */
-
 #include "cpp_security_bridge.h"
+#include "authenticated_encryption_module.h"
+#include "cryptographic_hashing_blake3.h"
+#include "constant_time_operations.h"
 #include <cstring>
 #include <stdexcept>
 
@@ -40,20 +38,42 @@ AEADCipher::~AEADCipher() { volatile char* p = reinterpret_cast<volatile char*>(
 std::vector<uint8_t> AEADCipher::encrypt(const uint8_t* plaintext, size_t len,
                                            const uint8_t* aad, size_t aad_len,
                                            const uint8_t nonce[12]) {
-    (void)plaintext; (void)len; (void)aad; (void)aad_len; (void)nonce;
-    return std::vector<uint8_t>(len);
+    if (!plaintext || !key_ || !nonce) return std::vector<uint8_t>();
+    std::vector<uint8_t> result(len);
+    uint8_t tag[16];
+    int ret = arix_aead_encrypt(key_, nonce, aad, aad_len, plaintext, len, result.data(), tag);
+    if (ret != 0) return std::vector<uint8_t>();
+    result.insert(result.end(), tag, tag + 16);
+    return result;
 }
 
 std::vector<uint8_t> AEADCipher::decrypt(const uint8_t* ciphertext, size_t len,
                                            const uint8_t* aad, size_t aad_len,
                                            const uint8_t nonce[12], const uint8_t tag[16]) {
-    (void)ciphertext; (void)len; (void)aad; (void)aad_len; (void)nonce; (void)tag;
-    return std::vector<uint8_t>(len);
+    if (!ciphertext || len < 16 || !key_ || !nonce || !tag) return std::vector<uint8_t>();
+    size_t ct_len = len - 16;
+    std::vector<uint8_t> result(ct_len);
+    int ret = arix_aead_decrypt(key_, nonce, aad, aad_len, ciphertext, ct_len, tag, result.data());
+    if (ret != 0) return std::vector<uint8_t>();
+    return result;
 }
 
 /* ---------- Hasher ---------- */
-Hasher::Hasher() : ctx_(nullptr) {}
-void Hasher::update(const uint8_t* data, size_t len) { (void)data; (void)len; }
-void Hasher::finalize(uint8_t* out, size_t out_len) { if (out) std::memset(out, 0, out_len); }
+Hasher::Hasher() {
+    ctx_ = new ArixBlake3State();
+    arix_blake3_init(static_cast<ArixBlake3State*>(ctx_));
+}
+void Hasher::update(const uint8_t* data, size_t len) {
+    if (data && len > 0 && ctx_) {
+        arix_blake3_update(static_cast<ArixBlake3State*>(ctx_), data, len);
+    }
+}
+void Hasher::finalize(uint8_t* out, size_t out_len) {
+    if (out && ctx_) {
+        arix_blake3_finalize(static_cast<ArixBlake3State*>(ctx_), out, out_len);
+    }
+    delete static_cast<ArixBlake3State*>(ctx_);
+    ctx_ = nullptr;
+}
 
 } /* namespace arix */

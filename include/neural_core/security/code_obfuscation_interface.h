@@ -8,6 +8,9 @@
 #include "opaque_predicate_generator.h"
 #include "virtualized_code_execution.h"
 #include "anti_debugging_countermeasure.h"
+#include <chrono>
+#include <vector>
+#include <cstdint>
 
 namespace arix {
 
@@ -30,6 +33,10 @@ struct ArixObfuscationReport {
     bool virtualization_applied;
     bool anti_debug_applied;
     double execution_time_ms;
+    double phase_light_ms;
+    double phase_medium_ms;
+    double phase_heavy_ms;
+    double phase_maximum_ms;
 };
 
 class ArixObfuscator {
@@ -42,6 +49,15 @@ public:
 
     ArixObfuscationReport obfuscate(ArixObfCFG& cfg);
     bool verify(ArixObfCFG& cfg, const std::vector<uint64_t>& test_inputs);
+    bool obfuscate_and_verify(ArixObfCFG& cfg, const std::vector<uint64_t>& test_inputs);
+    ArixObfuscationReport obfuscate_with_seed(ArixObfCFG& cfg, uint64_t seed);
+    bool run_self_test();
+    void reset();
+    void clear_string_pool();
+    size_t get_transform_count() const;
+    void print_report(const ArixObfuscationReport& report);
+    bool verify_extended(ArixObfCFG& cfg, const std::vector<uint64_t>& test_inputs);
+    void apply_obfuscation_preset(ArixObfCFG& cfg, int preset_id);
 
     ArixObfStringPool& string_pool() { return string_pool_; }
     ArixObfCFGFlattener& flattener() { return flattener_; }
@@ -63,6 +79,12 @@ private:
     void apply_medium(ArixObfCFG& cfg);
     void apply_heavy(ArixObfCFG& cfg);
     void apply_maximum(ArixObfCFG& cfg);
+    void shuffle_blocks(ArixObfCFG& cfg);
+    void encrypt_string_pool_rotating();
+    void seed_rng(uint64_t seed);
+    void apply_opaque_predicates_multi(ArixObfCFG& cfg, int layers);
+    void split_blocks(ArixObfCFG& cfg);
+    void apply_anti_debug_all();
 };
 
 } // namespace arix

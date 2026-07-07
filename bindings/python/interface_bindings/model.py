@@ -227,7 +227,7 @@ class SERModel:
         return [Tensor._from_ptr(p) for p in self._m.parameters()]
 
     def forward(self, input: Tensor) -> Tensor:
-        return input
+        return Tensor._from_ptr(self._m.forward(input._t))
 
     def __call__(self, input: Tensor) -> Tensor:
         return self.forward(input)
@@ -302,7 +302,14 @@ class ARCModel:
         self._config = config
 
     def forward(self, input: Tensor) -> Tensor:
-        return input
+        from . import _neural_engine_bridge as c
+        out_ptr = c._Tensor.create((1, 1), c.ArixDtype.FLOAT32)
+        metrics = [0.0, 0.0, 0.0, 0.0]
+        self._m.forward(input._t, out_ptr, metrics)
+        return Tensor._from_ptr(out_ptr)
+
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
 
 
 # ---- NPE Model ----
@@ -353,8 +360,7 @@ class NPEModel:
         self._config = config
 
     def load_program(self, program):
-        from . import _neural_engine_bridge as c
-        pass
+        self._vm.load(self._vm, program._prog if hasattr(program, '_prog') else program)
 
     def run(self, input: Tensor) -> Tensor:
         return Tensor._from_ptr(self._vm.run(input._t))

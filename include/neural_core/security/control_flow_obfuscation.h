@@ -12,7 +12,7 @@
 namespace arix {
 
 enum class ArixObfInstType {
-    NOP, ADD, SUB, MUL, DIV, MOV, JMP, JZ, JNZ, CALL, RET, CMP, LEA, AND, OR, XOR, NEG, PUSH, POP, LOAD, STORE
+    NOP, ADD, SUB, MUL, DIV, MOV, JMP, JZ, JNZ, CALL, RET, CMP, LEA, AND, OR, XOR, NEG, PUSH, POP, LOAD, STORE, NAND, NOT, SHL
 };
 
 struct ArixObfInstruction {

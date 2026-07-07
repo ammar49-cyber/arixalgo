@@ -89,6 +89,8 @@ static int process_sequence(ArixHSSModel* model, const float* input_seq,
 
         if (model->config.use_hierarchical) {
             arix_hss_hierarchical_scan(layer, &x_seq, &y_seq);
+        } else if (model->config.use_parallel_scan && s_dim <= 1024) {
+            arix_hss_parallel_scan(layer, &x_seq, &h_seq, &y_seq);
         } else {
             arix_hss_scan(layer, &x_seq, &h_seq, &y_seq);
         }

@@ -32,4 +32,21 @@
 #include "secure_cache_management.h"
 #include "power_analysis_mitigation.h"
 
+/* S4-S9 Security Extensions */
+#include "transport_security.h"
+#include "identity_management.h"
+#include "prompt_filter.h"
+#include "output_verifier.h"
+#include "data_poisoning_defense.h"
+#include "key_vault.h"
+#include "audit_logger.h"
+#include "signed_update.h"
+#include "model_checking.h"
+#include "self_audit.h"
+
+/* S7-S9 Extension Headers */
+#include "s7_extensions.h"
+#include "s8_extensions.h"
+#include "s9_extensions.h"
+
 #endif

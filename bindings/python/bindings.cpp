@@ -766,6 +766,12 @@ public:
         for (size_t i = 0; i < n; ++i) out.emplace_back(raw[i], false);
         return out;
     }
+
+    PyTensor forward(const PyTensor& input) {
+        ArixTensor* output = nullptr;
+        arix_ser_forward(ptr->layers[0], input.ptr, &output);
+        return PyTensor(output, true);
+    }
 };
 
 class PyARCLayer {
@@ -1548,7 +1554,8 @@ PYBIND11_MODULE(_neural_engine_bridge, m) {
     py::class_<PySERModel>(m, "_SERModel")
         .def(py::init<>())
         .def_static("create", &PySERModel::create)
-        .def("parameters", &PySERModel::parameters);
+        .def("parameters", &PySERModel::parameters)
+        .def("forward", &PySERModel::forward);
 
     py::class_<PyARCLayer>(m, "_ARCLayer")
         .def(py::init<>())

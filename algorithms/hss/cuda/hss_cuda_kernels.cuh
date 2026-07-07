@@ -38,6 +38,13 @@ void launch_hss_topk(cudaStream_t stream,
                       const float* scores, int* indices, float* values,
                       int batch_size, int num_classes, int k);
 
+/* ---------- Parallel prefix scan (Blelloch) for SSM ---------- */
+void launch_hss_parallel_scan(cudaStream_t stream,
+                               const float* A_bar, const float* B_bar,
+                               const float* C, const float* D,
+                               const float* x_seq, float* h_seq, float* y_seq,
+                               int seq_len, int s_dim, int i_dim, int o_dim);
+
 #ifdef __cplusplus
 }
 #endif

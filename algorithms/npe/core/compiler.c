@@ -232,56 +232,66 @@ ArixNPEProgram* arix_npe_jit_fuse(const ArixNPEProgram* prog) {
 
 ArixNPEProgram* arix_npe_jit_constant_fold(const ArixNPEProgram* prog, const ArixTensor* memory) {
     if (!prog) return NULL;
-    (void)memory;
     ArixNPEProgram* folded = arix_npe_program_create(prog->max_instructions);
     if (!folded) return NULL;
 
     int reg_const[16];
+    float reg_value[16];
     memset(reg_const, 0, sizeof(reg_const));
+    memset(reg_value, 0, sizeof(reg_value));
 
     for (size_t i = 0; i < prog->num_instructions; i++) {
         ArixNPEInstruction inst = prog->instructions[i];
 
-        if (inst.opcode == ARIX_LOAD && inst.immediate == 0) {
-            reg_const[inst.dest_reg] = 1;
+        if (inst.opcode == ARIX_LOAD) {
+            if (memory && inst.immediate >= 0 && (size_t)inst.immediate < memory->size) {
+                float* mem_data = (float*)memory->data;
+                reg_const[inst.dest_reg] = 1;
+                reg_value[inst.dest_reg] = mem_data[inst.immediate];
+            } else {
+                reg_const[inst.dest_reg] = 0;
+            }
         } else if (inst.opcode == ARIX_MUL &&
-                   ((reg_const[inst.src_reg_a] == 1) || (reg_const[inst.src_reg_b] == 1))) {
+                   reg_const[inst.src_reg_a] && reg_const[inst.src_reg_b]) {
+            reg_const[inst.dest_reg] = 1;
+            reg_value[inst.dest_reg] = reg_value[inst.src_reg_a] * reg_value[inst.src_reg_b];
             inst.opcode = ARIX_LOAD;
             inst.immediate = 0;
-            inst.src_reg_a = 0;
-            inst.src_reg_b = 0;
-            memset(inst.shape_a, 0, sizeof(inst.shape_a));
-            memset(inst.shape_b, 0, sizeof(inst.shape_b));
-            reg_const[inst.dest_reg] = 1;
         } else if (inst.opcode == ARIX_ADD &&
-                   (reg_const[inst.src_reg_a] == 1 && reg_const[inst.src_reg_b] == 1)) {
+                   reg_const[inst.src_reg_a] && reg_const[inst.src_reg_b]) {
+            reg_const[inst.dest_reg] = 1;
+            reg_value[inst.dest_reg] = reg_value[inst.src_reg_a] + reg_value[inst.src_reg_b];
             inst.opcode = ARIX_LOAD;
             inst.immediate = 0;
-            inst.src_reg_a = 0;
-            inst.src_reg_b = 0;
-            memset(inst.shape_a, 0, sizeof(inst.shape_a));
-            memset(inst.shape_b, 0, sizeof(inst.shape_b));
-            reg_const[inst.dest_reg] = 1;
         } else if (inst.opcode == ARIX_SUB &&
-                   (reg_const[inst.src_reg_a] == 1 && reg_const[inst.src_reg_b] == 1)) {
+                   reg_const[inst.src_reg_a] && reg_const[inst.src_reg_b]) {
+            reg_const[inst.dest_reg] = 1;
+            reg_value[inst.dest_reg] = reg_value[inst.src_reg_a] - reg_value[inst.src_reg_b];
             inst.opcode = ARIX_LOAD;
             inst.immediate = 0;
-            inst.src_reg_a = 0;
-            inst.src_reg_b = 0;
-            memset(inst.shape_a, 0, sizeof(inst.shape_a));
-            memset(inst.shape_b, 0, sizeof(inst.shape_b));
+        } else if (inst.opcode == ARIX_DIV &&
+                   reg_const[inst.src_reg_a] && reg_const[inst.src_reg_b] &&
+                   reg_value[inst.src_reg_b] != 0.0f) {
             reg_const[inst.dest_reg] = 1;
-        } else if (inst.opcode == ARIX_RELU && reg_const[inst.src_reg_a] == 1) {
+            reg_value[inst.dest_reg] = reg_value[inst.src_reg_a] / reg_value[inst.src_reg_b];
             inst.opcode = ARIX_LOAD;
             inst.immediate = 0;
-            inst.src_reg_a = 0;
-            inst.src_reg_b = 0;
-            memset(inst.shape_a, 0, sizeof(inst.shape_a));
-            memset(inst.shape_b, 0, sizeof(inst.shape_b));
+        } else if (inst.opcode == ARIX_RELU && reg_const[inst.src_reg_a]) {
             reg_const[inst.dest_reg] = 1;
-        } else if (inst.opcode == ARIX_LOAD) {
-            reg_const[inst.dest_reg] = 0;
-        } else if (inst.opcode == ARIX_STORE || inst.opcode == ARIX_HALT || inst.opcode == ARIX_BRANCH) {
+            reg_value[inst.dest_reg] = reg_value[inst.src_reg_a] > 0.0f ? reg_value[inst.src_reg_a] : 0.0f;
+            inst.opcode = ARIX_LOAD;
+            inst.immediate = 0;
+        } else if (inst.opcode == ARIX_EXP && reg_const[inst.src_reg_a]) {
+            reg_const[inst.dest_reg] = 1;
+            reg_value[inst.dest_reg] = expf(reg_value[inst.src_reg_a]);
+            inst.opcode = ARIX_LOAD;
+            inst.immediate = 0;
+        } else if (inst.opcode == ARIX_NEG && reg_const[inst.src_reg_a]) {
+            reg_const[inst.dest_reg] = 1;
+            reg_value[inst.dest_reg] = -reg_value[inst.src_reg_a];
+            inst.opcode = ARIX_LOAD;
+            inst.immediate = 0;
+        } else if (inst.opcode == ARIX_STORE || inst.opcode == ARIX_HALT) {
         } else if (inst.dest_reg >= 0 && inst.dest_reg < 16) {
             reg_const[inst.dest_reg] = 0;
         }

@@ -14,6 +14,7 @@ typedef struct {
     float dt_min;
     float dt_max;
     int use_hierarchical;
+    int use_parallel_scan;
 } ArixHSSConfig;
 
 typedef struct {
