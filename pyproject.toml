@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "arix-algo"
-version = "0.5.0"
+version = "0.5.4"
 description = "Next-generation AI architecture with security built into the foundation"
 requires-python = ">=3.11"
 license = {text = "MIT"}

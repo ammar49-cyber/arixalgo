@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.5.4",
   "patterns": {
     "include_guard": {
       "template": "#ifndef {GUARD}\n#define {GUARD}\n\n{CONTENT}\n\n#endif",

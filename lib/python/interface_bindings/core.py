@@ -1,6 +1,6 @@
 """
 Tensor Module — SKELETON
-Version: v0.5
+Version: v0.5.4
 
 Wraps C tensor operations via ctypes.
 """

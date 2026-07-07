@@ -1,6 +1,6 @@
 """
 ARIX-Algo Python Library — SKELETON
-Version: v0.5
+Version: v0.5.4
 
 High-level Python API for tensor operations, model construction,
 and training.  Wraps the C library via ctypes/cffi.

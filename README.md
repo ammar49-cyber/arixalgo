@@ -8,7 +8,7 @@
 > Not patched later. Not bolted on. **In every instruction.**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.1--alpha-blueviolet?style=for-the-badge" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-0.5.4--algo0.5.4-blueviolet?style=for-the-badge" alt="Version"/>
   <img src="https://img.shields.io/badge/C-11-00599C?style=for-the-badge&logo=c" alt="C11"/>
   <img src="https://img.shields.io/badge/C++-20-f34b7d?style=for-the-badge&logo=cplusplus" alt="C++20"/>
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python" alt="Python 3.11"/>
@@ -25,7 +25,7 @@
 
 - [🌟 What Is ARIX-Algo?](#-what-is-arix-algo)
 - [🧩 The Five Components](#-the-five-components)
-- [📊 What Works Now (v0.1.0)](#-what-works-now-v010)
+- [📊 What Works Now (v0.5.4)](#-what-works-now-v054)
 - [✅ What You Can Do](#-what-you-can-do)
 - [❌ What You Cannot Do (Yet)](#-what-you-cannot-do-yet)
 - [⚡ Quick Start](#-quick-start)
@@ -138,7 +138,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 
 ---
 
-## 📊 What Works Now (v0.1.0)
+## 📊 What Works Now (v0.5.4)
 
 | Component | Status | What Works | What Doesn't |
 |-----------|--------|-----------|--------------|
@@ -207,7 +207,7 @@ Per-node memory banks with euclidean similarity search, LRU eviction, and trust-
 - ❌ **Train a model** — autodiff backward pass is not implemented
 - ❌ **Benchmark against GPT-2** — wait for v1.0
 - ❌ **Use as PyTorch replacement** — not the goal
-- ❌ **Deploy to production** — v0.1.0 is a research prototype
+- ❌ **Deploy to production** — v0.5.4 is a research prototype
 
 ---
 
@@ -296,12 +296,12 @@ int main() {
 ```python
 from arix_algo import hello
 
-# 🚀 Currently a stub — full API coming in v0.5.0
+# 🚀 Currently a stub — full API coming in v0.5.4
 print(hello())
-# Output: "ARIX-Algo v0.1.0 — Core tensor operations implemented in C"
+# Output: "ARIX-Algo v0.5.4 — Core tensor operations implemented in C"
 ```
 
-**Planned Python API (v0.5.0):**
+**Planned Python API (v0.5.4):**
 
 ```python
 import arix_algo as ax

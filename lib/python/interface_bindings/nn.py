@@ -1,6 +1,6 @@
 """
 Neural Network Module — SKELETON
-Version: v0.5
+Version: v0.5.4
 
 High-level neural network layer abstractions.
 """

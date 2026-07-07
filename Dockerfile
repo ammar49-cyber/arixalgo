@@ -3,7 +3,7 @@ FROM ubuntu:22.04 AS builder
 
 LABEL org.opencontainers.image.title="ARIX-Algo"
 LABEL org.opencontainers.image.description="Next-generation AI architecture with security built into the foundation"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="0.5.4"
 LABEL org.opencontainers.image.licenses="MIT"
 
 ENV DEBIAN_FRONTEND=noninteractive

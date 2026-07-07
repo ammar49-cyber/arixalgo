@@ -1,6 +1,6 @@
 """
 Optimizer Module — SKELETON
-Version: v0.5
+Version: v0.5.4
 
 Optimizers for training neural networks.
 """
