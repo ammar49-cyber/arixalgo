@@ -1,6 +1,7 @@
 #include "memory_leak_detector.h"
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define LEAK_MAX_ALLOCATIONS 65536
 #define LEAK_BACKTRACE_DEPTH 16
