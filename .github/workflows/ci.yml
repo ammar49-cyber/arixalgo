@@ -20,6 +20,36 @@ jobs:
           cd build
           ctest -C Release -R "test_(kyber|dilithium|sphincsplus|differential_privacy|ddos|container|fuzzer|memory_leak|breakout|rlhf)" --output-on-failure --timeout 30
 
+  windows-python:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pybind11 numpy
+      - name: Build Python bindings
+        run: |
+          cmake -B build_py -DARIX_BUILD_PYTHON=ON -DARIX_USE_LTO=OFF
+          cmake --build build_py --target _arix_c --config Release -j2
+      - name: Verify Python bindings
+        run: |
+          python -c "import sys; sys.path.insert(0, 'bindings/python'); from arix_algo import _arix_c as ax; t = ax._Tensor.zeros([2,3], ax.FLOAT32); print('Python bindings OK:', t.shape)"
+
+  windows-bench:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure CMake for benchmarks
+        run: cmake -B build_bench -DARIX_BUILD_BENCHMARKS=ON -DARIX_BUILD_TESTS=OFF
+      - name: Build benchmarks
+        run: cmake --build build_bench --target bench_pq_crypto --config Release -j2
+      - name: Run PQ benchmarks
+        run: build_bench/tests/benchmark/Release/bench_pq_crypto.exe
+        timeout-minutes: 10
+
   ubuntu-gcc:
     runs-on: ubuntu-22.04
     steps:
