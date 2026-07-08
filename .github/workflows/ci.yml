@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  windows-msvc:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release -j4
+      - name: Test security libs
+        run: |
+          cd build
+          ctest -C Release -R "test_(kyber|dilithium|sphincsplus|differential_privacy|ddos|container|fuzzer|memory_leak|breakout|rlhf)" --output-on-failure --timeout 30
+
+  ubuntu-gcc:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake gcc-12 g++-12
+      - name: Configure CMake
+        run: CC=gcc-12 CXX=g++-12 cmake -B build -DCMAKE_BUILD_TYPE=Release -DARIX_USE_ASAN=ON
+      - name: Build
+        run: cmake --build build -j4
+      - name: Test
+        run: |
+          cd build
+          ctest -C Release --output-on-failure --timeout 30
+
+  ubuntu-clang:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake clang-14
+      - name: Configure CMake
+        run: CC=clang-14 CXX=clang++-14 cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j4
