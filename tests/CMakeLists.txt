@@ -11,6 +11,21 @@ macro(add_neural_test test_src link_libs)
         ${CMAKE_SOURCE_DIR}/include/neural_core/architecture
         ${CMAKE_SOURCE_DIR}/include/neural_core/security
         ${CMAKE_SOURCE_DIR}/tests
+        ${CMAKE_SOURCE_DIR}/lib/internal
+        ${CMAKE_SOURCE_DIR}/drivers/cuda
+        ${CMAKE_SOURCE_DIR}/drivers/tpu
+        ${CMAKE_SOURCE_DIR}/drivers/rocm
+        ${CMAKE_SOURCE_DIR}/fs/format
+        ${CMAKE_SOURCE_DIR}/security/monitor
+        ${CMAKE_SOURCE_DIR}/security/memory
+        ${CMAKE_SOURCE_DIR}/kernel
+        ${CMAKE_SOURCE_DIR}/security/crypto/c
+        ${CMAKE_SOURCE_DIR}/security/network
+        ${CMAKE_SOURCE_DIR}/security/updates
+        ${CMAKE_SOURCE_DIR}/security/formal
+        ${CMAKE_SOURCE_DIR}/security/pentest
+        ${CMAKE_SOURCE_DIR}/security/ai
+        ${CMAKE_SOURCE_DIR}/security/ui
     )
     add_test(NAME ${test_name} COMMAND ${test_name})
 endmacro()
@@ -38,6 +53,8 @@ macro(add_neural_cpp_test test_src link_libs)
         ${CMAKE_SOURCE_DIR}/include/neural_core/architecture
         ${CMAKE_SOURCE_DIR}/include/neural_core/security
         ${CMAKE_SOURCE_DIR}/tests
+        ${CMAKE_SOURCE_DIR}/security/obfuscation
+        ${CMAKE_SOURCE_DIR}/security/cpp/include
     )
     add_test(NAME ${test_name} COMMAND ${test_name})
 endmacro()

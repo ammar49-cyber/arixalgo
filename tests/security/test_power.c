@@ -1,5 +1,6 @@
 #include "power_analysis_mitigation.h"
 #include <stdio.h>
+#include <stdint.h>
 
 static int tests_passed = 0;
 static int tests_failed = 0;
