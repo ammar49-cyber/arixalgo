@@ -133,10 +133,12 @@ void ArixObfVM::compile_to_bytecode(ArixObfCFG& cfg) {
     for (auto& pair : cfg.blocks) {
         int block_id = (int)pair.first;
         if (block_id == 0) entry_offset_ = (int)bytecode_.size();
+        uint8_t op1 = 0;
+        uint8_t op2 = 0;
 
         for (auto& inst : pair.second->instructions) {
-            uint8_t op1 = (uint8_t)(vm_rng() % 8);
-            uint8_t op2 = (uint8_t)(vm_rng() % 8);
+            op1 = (uint8_t)(vm_rng() % 8);
+            op2 = (uint8_t)(vm_rng() % 8);
             uint8_t op3 = 0;
             switch (inst.type) {
                 case ArixObfInstType::ADD: emit_inst(bytecode_, 1, op1, op2, 0); break;

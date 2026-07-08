@@ -109,7 +109,7 @@ typedef struct {
     uint8_t section_hash[32];
     uintptr_t image_base;
     size_t image_size;
-    int protected;
+    int is_protected;
 } ArixAntiDump;
 
 int  arix_antidump_init(ArixAntiDump* ad);

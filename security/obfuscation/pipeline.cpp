@@ -83,7 +83,7 @@ void ArixObfuscator::apply_heavy(ArixObfCFG& cfg) {
     opaque.insert_predicates_to_cfg(cfg);
     transform_count_ += cfg.blocks.size() * 2;
     anti_debug_.full_scan();
-    anti_debug_.check_debugger();
+    anti_debug_.detect_debugger_present();
     transform_count_ += 2;
     substituter_.rename_registers_cfg(cfg);
     transform_count_ += cfg.blocks.size();
@@ -94,7 +94,7 @@ void ArixObfuscator::apply_maximum(ArixObfCFG& cfg) {
     vm_.encrypt_handler_table();
     transform_count_++;
     anti_debug_.full_scan();
-    anti_debug_.check_debugger();
+    anti_debug_.detect_debugger_present();
     transform_count_ += 2;
 }
 
@@ -296,9 +296,9 @@ void ArixObfuscator::split_blocks(ArixObfCFG& cfg) {
 
 void ArixObfuscator::apply_anti_debug_all() {
     anti_debug_.full_scan();
-    anti_debug_.check_debugger();
-    anti_debug_.trap_check();
-    anti_debug_.timing_analysis();
+    anti_debug_.detect_debugger_present();
+    anti_debug_.detect_breakpoint(nullptr, 0);
+    anti_debug_.detect_timing_anomaly();
     transform_count_ += 4;
 }
 

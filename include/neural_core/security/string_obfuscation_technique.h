@@ -21,6 +21,10 @@ class ArixObfStringPool {
 public:
     ArixObfStringPool();
     ~ArixObfStringPool();
+    ArixObfStringPool(ArixObfStringPool&&) = default;
+    ArixObfStringPool& operator=(ArixObfStringPool&&) = default;
+    ArixObfStringPool(const ArixObfStringPool&) = delete;
+    ArixObfStringPool& operator=(const ArixObfStringPool&) = delete;
 
     ArixObfString encrypt(const std::string& plaintext, uint32_t key);
     void decrypt(const ArixObfString& crypt, char* output, size_t output_len);

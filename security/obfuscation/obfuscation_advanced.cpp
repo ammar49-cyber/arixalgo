@@ -262,11 +262,11 @@ void* arix_iat_resolve_by_hash(ArixIATObfuscation* io, uint32_t hash) {
 #ifdef _WIN32
 static LONG CALLBACK arix_veh_handler(EXCEPTION_POINTERS* ep) {
     if (ep->ExceptionRecord->ExceptionCode==EXCEPTION_ACCESS_VIOLATION) {
-        ep->ContextRecord->Eip+=2;
+        ep->ContextRecord->Rip+=2;
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     if (ep->ExceptionRecord->ExceptionCode==EXCEPTION_ILLEGAL_INSTRUCTION) {
-        ep->ContextRecord->Eip+=3;
+        ep->ContextRecord->Rip+=3;
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     return EXCEPTION_CONTINUE_SEARCH;
@@ -417,7 +417,7 @@ int arix_antidump_init(ArixAntiDump* ad) {
 
 int arix_antidump_protect(ArixAntiDump* ad) {
     if (!ad) return -1;
-    ad->protected=1;
+    ad->is_protected=1;
 #ifdef _WIN32
     uintptr_t base=ad->image_base;
     if (!base) base=(uintptr_t)GetModuleHandleA(NULL);
@@ -458,7 +458,7 @@ int arix_antidump_protect(ArixAntiDump* ad) {
 
 int arix_antidump_verify(ArixAntiDump* ad) {
     if (!ad) return -1;
-    if (!ad->protected) return 0;
+    if (!ad->is_protected) return 0;
 #ifdef _WIN32
     uintptr_t base=ad->image_base;
     if (!base) base=(uintptr_t)GetModuleHandleA(NULL);

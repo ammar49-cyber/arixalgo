@@ -19,6 +19,13 @@ public:
     void substitute_compare(ArixObfBlock& block);
     void substitute_all(ArixObfBlock& block);
     void substitute_all_blocks(ArixObfCFG& cfg);
+    ArixObfInstruction make_lea_add(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_neg_sub_add(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_mul_shift_add(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_nand_and(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_nand_or(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_nand_xor(const ArixObfInstruction& inst);
+    std::vector<ArixObfInstruction> make_sub_cmp(const ArixObfInstruction& inst);
     void insert_junk(ArixObfBlock& block);
     void insert_junk_extended(ArixObfBlock& block);
     void rename_registers_block(ArixObfBlock& block, int& next_temp);

@@ -51,6 +51,10 @@ static ArixObfInstruction make_or(const std::string& result, const std::string& 
     ArixObfInstruction o; o.type = ArixObfInstType::OR; o.result = result; o.operand1 = op1; o.operand2 = op2; return o;
 }
 
+static ArixObfInstruction make_mul_inst(const ArixObfInstruction& inst) {
+    ArixObfInstruction m; m.type = ArixObfInstType::MUL; m.result = inst.result; m.operand1 = inst.operand1; m.operand2 = inst.operand2; return m;
+}
+
 static std::string temp_name(const std::string& base, int idx) {
     char buf[64]; snprintf(buf, sizeof(buf), "_t%d_%s", idx, base.c_str()); return std::string(buf);
 }
