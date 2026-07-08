@@ -3,14 +3,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int arix_model_init(ArixModel* model) {
+int arix_model_init(ArixFormalModel* model) {
     if (!model) return -1;
     memset(model, 0, sizeof(*model));
     model->initial_state = 0;
     return 0;
 }
 
-int arix_model_add_state(ArixModel* model, uint32_t state_id, int is_accepting, int is_error) {
+int arix_model_add_state(ArixFormalModel* model, uint32_t state_id, int is_accepting, int is_error) {
     if (!model || model->state_count >= ARIX_MODEL_MAX_STATES) return -1;
     ArixModelState* s = &model->states[model->state_count];
     s->state_id = state_id;
@@ -20,7 +20,7 @@ int arix_model_add_state(ArixModel* model, uint32_t state_id, int is_accepting, 
     return model->state_count++;
 }
 
-int arix_model_add_transition(ArixModel* model, uint32_t from, uint32_t to) {
+int arix_model_add_transition(ArixFormalModel* model, uint32_t from, uint32_t to) {
     if (!model) return -1;
     for (int i = 0; i < model->state_count; i++) {
         if (model->states[i].state_id == from && model->states[i].next_count < 8) {
@@ -31,13 +31,13 @@ int arix_model_add_transition(ArixModel* model, uint32_t from, uint32_t to) {
     return -1;
 }
 
-int arix_model_set_property(ArixModel* model, const char* property) {
+int arix_model_set_property(ArixFormalModel* model, const char* property) {
     if (!model || !property) return -1;
     strncpy(model->property, property, ARIX_MODEL_PROP_MAX_LEN - 1);
     return 0;
 }
 
-ArixModelCheckResult arix_model_check(ArixModel* model) {
+ArixModelCheckResult arix_model_check(ArixFormalModel* model) {
     ArixModelCheckResult result;
     memset(&result, 0, sizeof(result));
     if (!model) { result.property_satisfied = 0; return result; }
@@ -75,7 +75,7 @@ ArixModelCheckResult arix_model_check(ArixModel* model) {
     return result;
 }
 
-int arix_model_verify_invariant(ArixModel* model, int (*invariant)(uint32_t state_id)) {
+int arix_model_verify_invariant(ArixFormalModel* model, int (*invariant)(uint32_t state_id)) {
     if (!model || !invariant) return 0;
     for (int i = 0; i < model->state_count; i++) {
         if (!invariant(model->states[i].state_id)) return 0;
@@ -83,7 +83,7 @@ int arix_model_verify_invariant(ArixModel* model, int (*invariant)(uint32_t stat
     return 1;
 }
 
-int arix_model_check_reachability(ArixModel* model, uint32_t from_state, uint32_t to_state) {
+int arix_model_check_reachability(ArixFormalModel* model, uint32_t from_state, uint32_t to_state) {
     if (!model) return 0;
     int visited[ARIX_MODEL_MAX_STATES] = {0};
     int stack[ARIX_MODEL_MAX_STATES];
@@ -108,12 +108,12 @@ int arix_model_check_reachability(ArixModel* model, uint32_t from_state, uint32_
     return 0;
 }
 
-int arix_model_get_state_count(ArixModel* model) {
+int arix_model_get_state_count(ArixFormalModel* model) {
     if (!model) return -1;
     return model->state_count;
 }
 
-void arix_model_reset(ArixModel* model) {
+void arix_model_reset(ArixFormalModel* model) {
     if (!model) return;
     memset(model->states, 0, sizeof(ArixModelState) * model->state_count);
     model->state_count = 0;
@@ -121,7 +121,7 @@ void arix_model_reset(ArixModel* model) {
     memset(model->property, 0, ARIX_MODEL_PROP_MAX_LEN);
 }
 
-int arix_model_check_deadlock(ArixModel* model) {
+int arix_model_check_deadlock(ArixFormalModel* model) {
     if (!model) return -1;
     int deadlock_count = 0;
     for (int i = 0; i < model->state_count; i++) {
@@ -131,7 +131,7 @@ int arix_model_check_deadlock(ArixModel* model) {
     return deadlock_count;
 }
 
-int arix_model_export_dot(ArixModel* model, const char* output_path) {
+int arix_model_export_dot(ArixFormalModel* model, const char* output_path) {
     if (!model || !output_path) return -1;
     FILE* f = fopen(output_path, "w");
     if (!f) return -1;
@@ -156,13 +156,13 @@ int arix_model_export_dot(ArixModel* model, const char* output_path) {
     return 0;
 }
 
-int arix_model_add_transition_labeled(ArixModel* model, uint32_t from, uint32_t to, const char* label) {
+int arix_model_add_transition_labeled(ArixFormalModel* model, uint32_t from, uint32_t to, const char* label) {
     if (!model || !label) return -1;
     (void)label;
     return arix_model_add_transition(model, from, to);
 }
 
-int arix_model_find_trace(ArixModel* model, uint32_t from, uint32_t to, uint32_t* trace, int max_len) {
+int arix_model_find_trace(ArixFormalModel* model, uint32_t from, uint32_t to, uint32_t* trace, int max_len) {
     if (!model || !trace || max_len <= 0) return -1;
     int visited[ARIX_MODEL_MAX_STATES] = {0};
     int parent[ARIX_MODEL_MAX_STATES];
@@ -199,17 +199,17 @@ int arix_model_find_trace(ArixModel* model, uint32_t from, uint32_t to, uint32_t
     return -1;
 }
 
-int arix_model_get_reachable(ArixModel* model) {
+int arix_model_get_reachable(ArixFormalModel* model) {
     if (!model) return -1;
     ArixModelCheckResult r = arix_model_check(model);
     return r.reachable_states;
 }
 
-int arix_model_get_deadlock_count(ArixModel* model) {
+int arix_model_get_deadlock_count(ArixFormalModel* model) {
     return arix_model_check_deadlock(model);
 }
 
-int arix_model_has_cycle(ArixModel* model) {
+int arix_model_has_cycle(ArixFormalModel* model) {
     if (!model) return 0;
     int visited[ARIX_MODEL_MAX_STATES] = {0};
     int rec_stack[ARIX_MODEL_MAX_STATES] = {0};
@@ -238,7 +238,7 @@ int arix_model_has_cycle(ArixModel* model) {
     return 0;
 }
 
-int arix_model_get_cycle(ArixModel* model, uint32_t* cycle, int max_len) {
+int arix_model_get_cycle(ArixFormalModel* model, uint32_t* cycle, int max_len) {
     if (!model || !cycle || max_len < 2) return -1;
     (void)cycle;
     (void)max_len;
@@ -250,7 +250,7 @@ int arix_model_get_cycle(ArixModel* model, uint32_t* cycle, int max_len) {
     return -1;
 }
 
-int arix_model_minimize(ArixModel* model) {
+int arix_model_minimize(ArixFormalModel* model) {
     if (!model) return -1;
     ArixModelCheckResult r = arix_model_check(model);
     uint32_t reachable[ARIX_MODEL_MAX_STATES];
@@ -289,13 +289,13 @@ int arix_model_minimize(ArixModel* model) {
     return 0;
 }
 
-int arix_model_check_liveness(ArixModel* model, const char* property) {
+int arix_model_check_liveness(ArixFormalModel* model, const char* property) {
     if (!model || !property) return 0;
     (void)property;
     return arix_model_has_cycle(model) ? 0 : 1;
 }
 
-static int model_reachable_from_start(ArixModel* model, uint32_t target) {
+static int model_reachable_from_start(ArixFormalModel* model, uint32_t target) {
     if (!model) return 0;
     int visited[ARIX_MODEL_MAX_STATES] = {0};
     uint32_t stack[ARIX_MODEL_MAX_STATES];
@@ -319,7 +319,7 @@ static int model_reachable_from_start(ArixModel* model, uint32_t target) {
     return 0;
 }
 
-static int model_all_states_reachable(ArixModel* model) {
+static int model_all_states_reachable(ArixFormalModel* model) {
     if (!model || model->state_count == 0) return 0;
     int visited[ARIX_MODEL_MAX_STATES] = {0};
     uint32_t stack[ARIX_MODEL_MAX_STATES];
@@ -346,7 +346,7 @@ static int model_all_states_reachable(ArixModel* model) {
     return (reachable == model->state_count) ? 1 : 0;
 }
 
-static int model_find_deadlock_states(ArixModel* model, uint32_t* deadlocks, int max) {
+static int model_find_deadlock_states(ArixFormalModel* model, uint32_t* deadlocks, int max) {
     if (!model || !deadlocks || max <= 0) return 0;
     int count = 0;
     for (int i = 0; i < model->state_count && count < max; i++) {
@@ -357,7 +357,7 @@ static int model_find_deadlock_states(ArixModel* model, uint32_t* deadlocks, int
     return count;
 }
 
-static int model_count_transitions(ArixModel* model) {
+static int model_count_transitions(ArixFormalModel* model) {
     if (!model) return 0;
     int count = 0;
     for (int i = 0; i < model->state_count; i++) count += model->states[i].next_count;

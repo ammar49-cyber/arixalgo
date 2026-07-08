@@ -28,15 +28,15 @@ typedef struct {
     double bias_threshold;
     int check_factual_consistency;
     int max_output_length;
-} ArixOutputVerifier;
+} ArixS5Verifier;
 
-int  arix_output_verifier_init(ArixOutputVerifier* ov);
-void arix_output_verifier_destroy(ArixOutputVerifier* ov);
-int  arix_output_verifier_add_blocked_topic(ArixOutputVerifier* ov, const char* topic);
-int  arix_output_verifier_check(ArixOutputVerifier* ov, const char* output, size_t len);
-int  arix_output_verifier_sanitize(ArixOutputVerifier* ov,
-                                    const char* output, size_t len,
-                                    char* safe_output, size_t* safe_len);
+int  arix_s5_verifier_init(ArixS5Verifier* ov);
+void arix_s5_verifier_destroy(ArixS5Verifier* ov);
+int  arix_s5_verifier_add_blocked_topic(ArixS5Verifier* ov, const char* topic);
+int  arix_s5_verifier_check(ArixS5Verifier* ov, const char* output, size_t len);
+int  arix_s5_verifier_sanitize(ArixS5Verifier* ov,
+                                const char* output, size_t len,
+                                char* safe_output, size_t* safe_len);
 
 #ifdef __cplusplus
 }

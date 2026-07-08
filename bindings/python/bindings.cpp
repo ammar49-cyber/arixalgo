@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 
+extern "C" {
 #include "multidimensional_tensor_engine.h"
 #include "polymorphic_memory_allocator.h"
 #include "concurrent_workload_dispatch.h"
@@ -16,6 +17,7 @@
 #include "neural_programming_engine.h"
 #include "fractal_memory_orchestrator.h"
 #include "cryptographic_primitives_bundle.h"
+}
 
 #include <cstring>
 #include <string>
@@ -332,10 +334,10 @@ public:
     PyTensor unsqueeze(size_t dim) const { return PyTensor(arix_tensor_unsqueeze(ptr, dim)); }
     PyTensor slice(size_t dim, size_t start, size_t end) const { return PyTensor(arix_tensor_slice(ptr, dim, start, end)); }
 
-    static PyTensor concat(const std::vector<PyTensor>& tensors, size_t dim) {
+    static PyTensor concat(py::list tensors, size_t dim) {
         std::vector<const ArixTensor*> raw(tensors.size());
         for (size_t i = 0; i < tensors.size(); ++i)
-            raw[i] = tensors[i].ptr;
+            raw[i] = tensors[i].cast<PyTensor*>()->ptr;
         return PyTensor(arix_tensor_concat(raw.data(), raw.size(), dim));
     }
 
@@ -586,9 +588,12 @@ public:
     PyVariable dropout(PyVariable& a, float rate, unsigned int seed) { return PyVariable(arix_dropout(ptr, a.ptr, rate, seed)); }
     PyVariable layer_norm(PyVariable& a, PyVariable& gamma, PyVariable& beta, float eps) { return PyVariable(arix_layer_norm(ptr, a.ptr, gamma.ptr, beta.ptr, eps)); }
     PyVariable conv2d(PyVariable& input, PyVariable& kernel, size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w) { return PyVariable(arix_conv2d(ptr, input.ptr, kernel.ptr, stride_h, stride_w, pad_h, pad_w)); }
-    PyVariable concat(std::vector<PyVariable>& vars, size_t dim) {
-        std::vector<ArixVariable*> raw(vars.size());
-        for (size_t i = 0; i < vars.size(); ++i) raw[i] = vars[i].ptr;
+    PyVariable concat(py::args args) {
+        size_t dim = args[args.size() - 1].cast<size_t>();
+        size_t n = args.size() - 1;
+        std::vector<ArixVariable*> raw(n);
+        for (size_t i = 0; i < n; ++i)
+            raw[i] = args[i].cast<PyVariable*>()->ptr;
         return PyVariable(arix_concat(ptr, raw.data(), raw.size(), dim));
     }
     PyVariable mse_loss(PyVariable& pred, PyVariable& target) { return PyVariable(arix_mse_loss(ptr, pred.ptr, target.ptr)); }
@@ -614,10 +619,10 @@ public:
         return *this;
     }
 
-    void step(std::vector<PyTensor>& params, std::vector<PyTensor>& grads) {
+    void step(py::list params, py::list grads) {
         std::vector<ArixTensor*> p(params.size()), g(grads.size());
-        for (size_t i = 0; i < params.size(); ++i) p[i] = params[i].ptr;
-        for (size_t i = 0; i < grads.size(); ++i) g[i] = grads[i].ptr;
+        for (size_t i = 0; i < params.size(); ++i) p[i] = params[i].cast<PyTensor*>()->ptr;
+        for (size_t i = 0; i < grads.size(); ++i) g[i] = grads[i].cast<PyTensor*>()->ptr;
         arix_optimizer_step(ptr, p.data(), g.data(), params.size());
     }
 
@@ -984,11 +989,10 @@ namespace py_crypto {
     // ChaCha20
     py::bytes chacha20_encrypt(py::bytes key, py::bytes nonce, py::bytes plaintext, uint32_t counter) {
         std::string k = key, n = nonce, p = plaintext;
-        std::string out(p.size(), 0);
-        // arix_chacha20_xor(const uint8_t key[32], const uint8_t nonce[12], uint32_t counter, const uint8_t* in, uint8_t* out, size_t len);
-        // extern declaration needed — assume prototype from chacha20_stream_cipher.h
-        // For binding completeness we include the call; actual linking resolves.
-        // arix_chacha20_xor((const uint8_t*)k.data(), (const uint8_t*)n.data(), counter, (const uint8_t*)p.data(), (uint8_t*)out.data(), p.size());
+        std::string out(p);
+        ArixChaCha20State state;
+        arix_chacha20_init(&state, (const uint8_t*)k.data(), (const uint8_t*)n.data(), counter);
+        arix_chacha20_encrypt(&state, (uint8_t*)out.data(), out.size());
         return py::bytes(out);
     }
 
@@ -1004,7 +1008,10 @@ namespace py_crypto {
     py::bytes sha3_256(py::bytes data) {
         std::string d = data;
         uint8_t hash[32];
-        arix_sha3_256((const uint8_t*)d.data(), d.size(), hash);
+        ArixSHA3State state;
+        arix_sha3_256_init(&state);
+        arix_sha3_update(&state, (const uint8_t*)d.data(), d.size());
+        arix_sha3_finish(&state, hash);
         return py::bytes(reinterpret_cast<char*>(hash), 32);
     }
 
@@ -1012,38 +1019,49 @@ namespace py_crypto {
     py::bytes blake3(py::bytes data) {
         std::string d = data;
         uint8_t hash[32];
-        arix_blake3_hash((const uint8_t*)d.data(), d.size(), hash);
+        ArixBlake3State state;
+        arix_blake3_init(&state);
+        arix_blake3_update(&state, (const uint8_t*)d.data(), d.size());
+        arix_blake3_finish(&state, hash);
         return py::bytes(reinterpret_cast<char*>(hash), 32);
     }
 
     // Ed25519
     py::tuple ed25519_keypair() {
-        uint8_t pk[32], sk[64];
-        arix_ed25519_keypair(pk, sk);
-        return py::make_tuple(py::bytes(reinterpret_cast<char*>(pk), 32),
-                              py::bytes(reinterpret_cast<char*>(sk), 64));
+        ArixEd25519Keypair kp;
+        arix_ed25519_keypair_generate(&kp);
+        return py::make_tuple(py::bytes(reinterpret_cast<char*>(kp.public_key), 32),
+                              py::bytes(reinterpret_cast<char*>(kp.private_key), 64));
     }
 
-    py::bytes ed25519_sign(py::bytes message, py::bytes sk) {
-        std::string m = message, s = sk;
-        uint8_t sig[64];
-        arix_ed25519_sign((const uint8_t*)m.data(), m.size(),
-                          (const uint8_t*)s.data(), sig);
-        return py::bytes(reinterpret_cast<char*>(sig), 64);
+    py::bytes ed25519_sign(py::bytes message, py::bytes sk_bytes) {
+        std::string m = message, sk = sk_bytes;
+        if (sk.size() < 64) throw std::runtime_error("ed25519 private key must be 64 bytes");
+        ArixEd25519Keypair kp;
+        memcpy(kp.public_key, sk.data() + 32, 32);
+        arix_ed25519_secret_key_expand(kp.private_key, (const uint8_t*)sk.data());
+        ArixEd25519Signature sig;
+        arix_ed25519_sign(&kp, (const uint8_t*)m.data(), m.size(), &sig);
+        return py::bytes(reinterpret_cast<char*>(sig.data), 64);
     }
 
-    int ed25519_verify(py::bytes signature, py::bytes message, py::bytes pk) {
-        std::string sig = signature, m = message, p = pk;
-        return arix_ed25519_verify((const uint8_t*)sig.data(),
+    int ed25519_verify(py::bytes signature, py::bytes message, py::bytes pk_bytes) {
+        std::string sig = signature, m = message, pk = pk_bytes;
+        ArixEd25519Signature sig_struct;
+        memcpy(sig_struct.data, sig.data(), 64);
+        return arix_ed25519_verify((const uint8_t*)pk.data(),
                                    (const uint8_t*)m.data(), m.size(),
-                                   (const uint8_t*)p.data());
+                                   &sig_struct);
     }
 
     // Poly1305
     py::bytes poly1305_mac(py::bytes key, py::bytes message) {
         std::string k = key, m = message;
         uint8_t mac[16];
-        arix_poly1305_mac((const uint8_t*)k.data(), (const uint8_t*)m.data(), m.size(), mac);
+        ArixPoly1305State state;
+        arix_poly1305_init(&state, (const uint8_t*)k.data());
+        arix_poly1305_update(&state, (const uint8_t*)m.data(), m.size());
+        arix_poly1305_finish(&state, mac);
         return py::bytes(reinterpret_cast<char*>(mac), 16);
     }
 
@@ -1052,10 +1070,10 @@ namespace py_crypto {
         std::string k = key, n = nonce, p = plaintext, a = aad;
         std::string ct(p.size(), 0);
         uint8_t tag[16];
-        arix_aead_encrypt((const uint8_t*)k.data(), (const uint8_t*)n.data(),
-                          (const uint8_t*)a.data(), a.size(),
+        arix_aead_encrypt((uint8_t*)ct.data(), tag,
                           (const uint8_t*)p.data(), p.size(),
-                          (uint8_t*)ct.data(), tag);
+                          (const uint8_t*)a.data(), a.size(),
+                          (const uint8_t*)k.data(), (const uint8_t*)n.data());
         return py::bytes(ct + std::string(reinterpret_cast<char*>(tag), 16));
     }
 
@@ -1064,10 +1082,11 @@ namespace py_crypto {
         if (ct.size() < 16) throw std::runtime_error("ciphertext too short");
         std::string pt(ct.size() - 16, 0);
         const uint8_t* tag = (const uint8_t*)(ct.data() + ct.size() - 16);
-        if (0 != arix_aead_decrypt((const uint8_t*)k.data(), (const uint8_t*)n.data(),
-                                   (const uint8_t*)a.data(), a.size(),
+        if (0 != arix_aead_decrypt((uint8_t*)pt.data(),
                                    (const uint8_t*)ct.data(), ct.size() - 16,
-                                   (uint8_t*)pt.data(), tag))
+                                   tag,
+                                   (const uint8_t*)a.data(), a.size(),
+                                   (const uint8_t*)k.data(), (const uint8_t*)n.data()))
             throw std::runtime_error("AEAD decryption failed");
         return py::bytes(pt);
     }
@@ -1076,10 +1095,14 @@ namespace py_crypto {
     py::bytes argon2_hash(py::bytes password, py::bytes salt, size_t time_cost, size_t mem_cost, size_t parallelism, size_t hash_len) {
         std::string p = password, s = salt;
         std::string out(hash_len, 0);
-        arix_argon2_hash(time_cost, mem_cost, parallelism,
-                         (const uint8_t*)p.data(), p.size(),
-                         (const uint8_t*)s.data(), s.size(),
-                         (uint8_t*)out.data(), hash_len);
+        ArixArgon2Config config;
+        config.memory_kb = mem_cost;
+        config.iterations = time_cost;
+        config.parallelism = parallelism;
+        config.hash_len = hash_len;
+        arix_argon2id((const uint8_t*)p.data(), p.size(),
+                      (const uint8_t*)s.data(), s.size(),
+                      &config, (uint8_t*)out.data());
         return py::bytes(out);
     }
 
@@ -1099,14 +1122,14 @@ namespace py_crypto {
     // Constant-time compare
     int ct_compare(py::bytes a, py::bytes b) {
         std::string sa = a, sb = b;
-        return arix_ct_compare((const uint8_t*)sa.data(), (const uint8_t*)sb.data(), sa.size());
+        return arix_ct_equal((const uint8_t*)sa.data(), (const uint8_t*)sb.data(), sa.size());
     }
 }
 
 // ---------------------------------------------------------------------------
 // Python module
 // ---------------------------------------------------------------------------
-PYBIND11_MODULE(_neural_engine_bridge, m) {
+PYBIND11_MODULE(_arix_c, m) {
     m.doc() = "ARIX Algo - Python bindings";
 
     // ---- Enums ----
@@ -1525,8 +1548,18 @@ PYBIND11_MODULE(_neural_engine_bridge, m) {
         .def_readwrite("src_reg_a", &ArixNPEInstruction::src_reg_a)
         .def_readwrite("src_reg_b", &ArixNPEInstruction::src_reg_b)
         .def_readwrite("immediate", &ArixNPEInstruction::immediate)
-        .def_readwrite("shape_a", &ArixNPEInstruction::shape_a)
-        .def_readwrite("shape_b", &ArixNPEInstruction::shape_b);
+        .def_property("shape_a",
+            [](ArixNPEInstruction& inst) { return py::make_tuple(inst.shape_a[0], inst.shape_a[1]); },
+            [](ArixNPEInstruction& inst, py::tuple t) {
+                inst.shape_a[0] = t[0].cast<int>();
+                inst.shape_a[1] = t[1].cast<int>();
+            })
+        .def_property("shape_b",
+            [](ArixNPEInstruction& inst) { return py::make_tuple(inst.shape_b[0], inst.shape_b[1]); },
+            [](ArixNPEInstruction& inst, py::tuple t) {
+                inst.shape_b[0] = t[0].cast<int>();
+                inst.shape_b[1] = t[1].cast<int>();
+            });
 
     // ---- LRScheduler ----
     py::class_<PyLRScheduler>(m, "_LRScheduler")

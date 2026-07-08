@@ -29,7 +29,7 @@ typedef struct {
     int state_count;
     int initial_state;
     char property[ARIX_MODEL_PROP_MAX_LEN];
-} ArixModel;
+} ArixFormalModel;
 
 typedef struct {
     int total_states;
@@ -40,12 +40,12 @@ typedef struct {
     char counterexample[ARIX_MODEL_PROP_MAX_LEN];
 } ArixModelCheckResult;
 
-int  arix_model_init(ArixModel* model);
-int  arix_model_add_state(ArixModel* model, uint32_t state_id, int is_accepting, int is_error);
-int  arix_model_add_transition(ArixModel* model, uint32_t from, uint32_t to);
-int  arix_model_set_property(ArixModel* model, const char* property);
-ArixModelCheckResult arix_model_check(ArixModel* model);
-int  arix_model_verify_invariant(ArixModel* model, int (*invariant)(uint32_t state_id));
+int  arix_model_init(ArixFormalModel* model);
+int  arix_model_add_state(ArixFormalModel* model, uint32_t state_id, int is_accepting, int is_error);
+int  arix_model_add_transition(ArixFormalModel* model, uint32_t from, uint32_t to);
+int  arix_model_set_property(ArixFormalModel* model, const char* property);
+ArixModelCheckResult arix_model_check(ArixFormalModel* model);
+int  arix_model_verify_invariant(ArixFormalModel* model, int (*invariant)(uint32_t state_id));
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-ArixOutputVerifier* arix_output_verifier_create(size_t output_dim, size_t num_layers, unsigned int seed) {
+ArixOutputVerifier* arix_arc_output_verifier_create(size_t output_dim, size_t num_layers, unsigned int seed) {
     ArixOutputVerifier* verifier = (ArixOutputVerifier*)arix_malloc(sizeof(ArixOutputVerifier), 64);
     if (!verifier) return NULL;
     memset(verifier, 0, sizeof(ArixOutputVerifier));
@@ -53,7 +53,7 @@ ArixOutputVerifier* arix_output_verifier_create(size_t output_dim, size_t num_la
     return verifier;
 }
 
-void arix_output_verifier_destroy(ArixOutputVerifier* verifier) {
+void arix_arc_output_verifier_destroy(ArixOutputVerifier* verifier) {
     if (!verifier) return;
     for (size_t i = 0; i < verifier->num_layers; i++) {
         if (verifier->verification_weights[i]) arix_tensor_destroy(verifier->verification_weights[i]);

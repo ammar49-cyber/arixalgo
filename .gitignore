@@ -1,5 +1,6 @@
 # Build artifacts
 build/
+build_py/
 build_standalone/
 out/
 dist/
@@ -37,6 +38,8 @@ venv/
 .venv/
 src/python/arix_algo/Release/
 src/python/arix_algo/Debug/
+bindings/python/arix_algo/Release/
+bindings/python/arix_algo/Debug/
 
 # Node
 node_modules/

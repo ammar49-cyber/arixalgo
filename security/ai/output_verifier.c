@@ -45,7 +45,7 @@ static int total_profanity_hits = 0;
 static int total_toxicity_hits = 0;
 static int total_bias_hits = 0;
 
-int arix_output_verifier_init(ArixOutputVerifier* ov) {
+int arix_output_verifier_init(ArixS5Verifier* ov) {
     if (!ov) return -1;
     memset(ov, 0, sizeof(*ov));
     ov->toxicity_threshold = 0.7;
@@ -65,11 +65,11 @@ int arix_output_verifier_init(ArixOutputVerifier* ov) {
     return 0;
 }
 
-void arix_output_verifier_destroy(ArixOutputVerifier* ov) {
+void arix_output_verifier_destroy(ArixS5Verifier* ov) {
     if (ov) memset(ov, 0, sizeof(*ov));
 }
 
-int arix_output_verifier_add_blocked_topic(ArixOutputVerifier* ov, const char* topic) {
+int arix_output_verifier_add_blocked_topic(ArixS5Verifier* ov, const char* topic) {
     if (!ov || !topic || ov->topic_count >= ARIX_MAX_TOPIC_BLOCKLIST) return -1;
     ArixBlockedTopic* bt = &ov->topics[ov->topic_count];
     strncpy(bt->topic, topic, ARIX_TOPIC_MAX_LEN - 1);
@@ -77,7 +77,7 @@ int arix_output_verifier_add_blocked_topic(ArixOutputVerifier* ov, const char* t
     return ov->topic_count++;
 }
 
-int arix_output_verifier_check(ArixOutputVerifier* ov, const char* output, size_t len) {
+int arix_output_verifier_check(ArixS5Verifier* ov, const char* output, size_t len) {
     if (!ov || !output) return 0;
     total_checks++;
     char lower[512];
@@ -100,7 +100,7 @@ int arix_output_verifier_check(ArixOutputVerifier* ov, const char* output, size_
     return 0;
 }
 
-int arix_output_verifier_sanitize(ArixOutputVerifier* ov,
+int arix_output_verifier_sanitize(ArixS5Verifier* ov,
                                     const char* output, size_t len,
                                     char* safe_output, size_t* safe_len) {
     if (!ov || !output || !safe_output || !safe_len) return -1;
@@ -118,7 +118,7 @@ int arix_output_verifier_sanitize(ArixOutputVerifier* ov,
     return 0;
 }
 
-int arix_output_verifier_add_allowed_topic(ArixOutputVerifier* ov, const char* topic) {
+int arix_output_verifier_add_allowed_topic(ArixS5Verifier* ov, const char* topic) {
     (void)ov;
     if (!topic || allowed_topic_count >= ARIX_MAX_ALLOWED_TOPICS) return -1;
     strncpy(allowed_topics[allowed_topic_count], topic, ARIX_TOPIC_MAX_LEN - 1);
@@ -130,14 +130,14 @@ void arix_output_verifier_reset_topics(void) {
     allowed_topic_count = 0;
 }
 
-int arix_output_verifier_get_stats(ArixOutputVerifier* ov, int* topic_count, int* block_count) {
+int arix_output_verifier_get_stats(ArixS5Verifier* ov, int* topic_count, int* block_count) {
     if (!ov || !topic_count || !block_count) return -1;
     *topic_count = ov->topic_count;
     *block_count = verifier_block_count;
     return 0;
 }
 
-int arix_output_verifier_check_full(ArixOutputVerifier* ov, const char* output, size_t len) {
+int arix_output_verifier_check_full(ArixS5Verifier* ov, const char* output, size_t len) {
     if (!ov || !output) return 0;
     if (arix_output_verifier_check(ov, output, len)) return 1;
 
@@ -326,11 +326,11 @@ int arix_output_verifier_get_bias_hits(void) {
     return total_bias_hits;
 }
 
-double arix_output_verifier_get_toxicity_threshold(ArixOutputVerifier* ov) {
+double arix_output_verifier_get_toxicity_threshold(ArixS5Verifier* ov) {
     return ov ? ov->toxicity_threshold : 0.0;
 }
 
-double arix_output_verifier_get_bias_threshold(ArixOutputVerifier* ov) {
+double arix_output_verifier_get_bias_threshold(ArixS5Verifier* ov) {
     return ov ? ov->bias_threshold : 0.0;
 }
 
@@ -338,7 +338,7 @@ int arix_output_verifier_get_allowed_topic_count(void) {
     return allowed_topic_count;
 }
 
-int arix_output_verifier_add_allowed_topic_by_index(ArixOutputVerifier* ov, int index) {
+int arix_output_verifier_add_allowed_topic_by_index(ArixS5Verifier* ov, int index) {
     (void)ov; (void)index;
     return -1;
 }
@@ -356,16 +356,16 @@ int arix_output_verifier_remove_allowed_topic(const char* topic) {
     return -1;
 }
 
-int arix_output_verifier_blocked_topic_count(ArixOutputVerifier* ov) {
+int arix_output_verifier_blocked_topic_count(ArixS5Verifier* ov) {
     return ov ? ov->topic_count : 0;
 }
 
-const char* arix_output_verifier_get_blocked_topic(ArixOutputVerifier* ov, int index) {
+const char* arix_output_verifier_get_blocked_topic(ArixS5Verifier* ov, int index) {
     if (!ov || index < 0 || index >= ov->topic_count) return NULL;
     return ov->topics[index].topic;
 }
 
-int arix_output_verifier_unblock_topic(ArixOutputVerifier* ov, const char* topic) {
+int arix_output_verifier_unblock_topic(ArixS5Verifier* ov, const char* topic) {
     if (!ov || !topic) return -1;
     for (int i = 0; i < ov->topic_count; i++) {
         if (strcmp(ov->topics[i].topic, topic) == 0) {
@@ -475,7 +475,7 @@ int arix_output_verifier_check_bias(const char* text, size_t len) {
     for (int b = 0; bias_terms[b]; b++) { if (strstr(lower, bias_terms[b])) hits++; }
     return hits;
 }
-int arix_output_verifier_check_full_extended(ArixOutputVerifier* ov, const char* output, size_t len, int* flags) {
+int arix_output_verifier_check_full_extended(ArixS5Verifier* ov, const char* output, size_t len, int* flags) {
     if (!ov || !output || !flags) return -1;
     *flags = 0;
     if (arix_output_verifier_check(ov, output, len)) *flags |= 1;
@@ -505,7 +505,7 @@ int arix_output_verifier_check_profanity_batch(const char** texts, const size_t*
     for (int i = 0; i < count; i++) results[i] = arix_output_verifier_check_profanity(texts[i], lens[i]);
     return 0;
 }
-int arix_output_verifier_check_consistency(ArixOutputVerifier* ov, const char* output, size_t len) {
+int arix_output_verifier_check_consistency(ArixS5Verifier* ov, const char* output, size_t len) {
     if (!ov || !output) return 0;
     if (!ov->check_factual_consistency) return 0;
     char lower[512]; size_t clen = (len < sizeof(lower) - 1) ? len : sizeof(lower) - 1;
@@ -521,14 +521,14 @@ int arix_output_verifier_get_toxicity_count(void) { return total_toxicity_hits; 
 int arix_output_verifier_get_bias_count(void) { return total_bias_hits; }
 void arix_output_verifier_set_pii_detection(int enabled) { pii_detection_enabled = enabled; }
 int arix_output_verifier_get_verifier_block_count(void) { return verifier_block_count; }
-int arix_output_verifier_check_all(ArixOutputVerifier* ov, const char* output, size_t len, int* toxicity_flag, int* pii_flag, int* profanity_flag) {
+int arix_output_verifier_check_all(ArixS5Verifier* ov, const char* output, size_t len, int* toxicity_flag, int* pii_flag, int* profanity_flag) {
     if (!ov || !output || !toxicity_flag || !pii_flag || !profanity_flag) return -1;
     *toxicity_flag = arix_output_verifier_check(ov, output, len);
     *pii_flag = arix_output_verifier_check_pii_all(output, len);
     *profanity_flag = arix_output_verifier_check_profanity(output, len);
     return (*toxicity_flag || *pii_flag || *profanity_flag) ? 1 : 0;
 }
-int arix_output_verifier_check_full_report(ArixOutputVerifier* ov, const char* output, size_t len, char* report, size_t report_size) {
+int arix_output_verifier_check_full_report(ArixS5Verifier* ov, const char* output, size_t len, char* report, size_t report_size) {
     if (!ov || !output || !report || report_size == 0) return -1;
     int t, p, prof;
     arix_output_verifier_check_all(ov, output, len, &t, &p, &prof);

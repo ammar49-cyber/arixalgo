@@ -22,12 +22,12 @@ static int sample_invariant(uint32_t state_id) {
 }
 
 static void test_model_init(void) {
-    ArixModel model;
+    ArixFormalModel model;
     ASSERT(arix_model_init(&model) == 0, "model init");
 }
 
 static void test_model_simple_graph(void) {
-    ArixModel model;
+    ArixFormalModel model;
     arix_model_init(&model);
     arix_model_add_state(&model, 0, 0, 0);
     arix_model_add_state(&model, 1, 1, 0);
@@ -40,7 +40,7 @@ static void test_model_simple_graph(void) {
 }
 
 static void test_model_invariant(void) {
-    ArixModel model;
+    ArixFormalModel model;
     arix_model_init(&model);
     arix_model_add_state(&model, 0, 0, 0);
     arix_model_add_state(&model, 1, 0, 0);

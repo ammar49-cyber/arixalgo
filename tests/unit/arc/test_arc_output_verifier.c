@@ -10,17 +10,17 @@ static void run_test(const char* name, void (*fn)(void)) {
 }
 
 static void test_verifier_create(void) {
-    ArixOutputVerifier* v = arix_output_verifier_create(32, 2, 42);
+    ArixOutputVerifier* v = arix_arc_output_verifier_create(32, 2, 42);
     ASSERT(v != NULL, "verifier not null");
     ASSERT(v->verification_weights[0]->shape[0] == 32, "w0 rows 32");
     ASSERT(v->verification_weights[0]->shape[1] == 32, "w0 cols 32");
     ASSERT(v->verification_weights[1] != NULL, "w1 not null");
     ASSERT(v->num_layers == 2, "num_layers == 2");
-    arix_output_verifier_destroy(v);
+    arix_arc_output_verifier_destroy(v);
 }
 
 static void test_verify_normal(void) {
-    ArixOutputVerifier* v = arix_output_verifier_create(16, 1, 42);
+    ArixOutputVerifier* v = arix_arc_output_verifier_create(16, 1, 42);
     ASSERT(v != NULL, "verifier not null");
 
     size_t shape_in[] = {4, 16};
@@ -39,11 +39,11 @@ static void test_verify_normal(void) {
 
     arix_tensor_destroy(out);
     if (verified) arix_tensor_destroy(verified);
-    arix_output_verifier_destroy(v);
+    arix_arc_output_verifier_destroy(v);
 }
 
 static void test_verify_inconsistent(void) {
-    ArixOutputVerifier* v = arix_output_verifier_create(16, 1, 42);
+    ArixOutputVerifier* v = arix_arc_output_verifier_create(16, 1, 42);
     ASSERT(v != NULL, "verifier not null");
 
     size_t shape_in[] = {4, 16};
@@ -73,7 +73,7 @@ static void test_verify_inconsistent(void) {
     arix_tensor_destroy(out1);
     arix_tensor_destroy(out2);
     if (verified2) arix_tensor_destroy(verified2);
-    arix_output_verifier_destroy(v);
+    arix_arc_output_verifier_destroy(v);
 }
 
 int main(void) {

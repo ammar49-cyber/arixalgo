@@ -132,7 +132,7 @@ if(ARIX_BUILD_BENCHMARKS)
 endif()
 
 if(ARIX_BUILD_PYTHON)
-    add_subdirectory(src/python)
+    add_subdirectory(bindings/python)
 endif()
 
 if(ARIX_BUILD_CUDA)

@@ -47,13 +47,13 @@ static void test_prompt_filter_sanitize(void) {
 }
 
 static void test_output_verifier_init(void) {
-    ArixOutputVerifier ov;
+    ArixS5Verifier ov;
     ASSERT(arix_output_verifier_init(&ov) == 0, "output verifier init");
     arix_output_verifier_destroy(&ov);
 }
 
 static void test_output_verifier_blocked_topics(void) {
-    ArixOutputVerifier ov;
+    ArixS5Verifier ov;
     arix_output_verifier_init(&ov);
     ASSERT(arix_output_verifier_check(&ov, "this is fine", 12) == 0, "clean output");
     ASSERT(arix_output_verifier_check(&ov, "how to make weapons", 19) == 1, "blocked topic");
