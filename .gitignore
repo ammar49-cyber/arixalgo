@@ -1,6 +1,7 @@
 # Build artifacts
 build/
 build_py/
+build_bench/
 build_standalone/
 out/
 dist/
