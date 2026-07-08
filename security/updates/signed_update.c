@@ -69,7 +69,7 @@ int arix_update_verifier_check(ArixUpdateVerifier* uv, const ArixSignedUpdate* u
     arix_blake3_update(&ctx, (const uint8_t*)&update->version_major, sizeof(uint32_t) * 3);
     arix_blake3_update(&ctx, (const uint8_t*)&update->chunk_count, sizeof(int));
     arix_blake3_update(&ctx, (const uint8_t*)&update->timestamp, sizeof(uint64_t));
-    arix_blake3_finalize(&ctx, computed_hash, ARIX_UPDATE_HASH_LEN);
+    arix_blake3_finish(&ctx, computed_hash);
 
     int sig_ok = arix_ct_equal(computed_hash, update->update_hash, ARIX_UPDATE_HASH_LEN) ? 1 : 0;
     return sig_ok;
@@ -144,7 +144,7 @@ int arix_update_verifier_sign_update(ArixSignedUpdate* update, const uint8_t* si
     arix_blake3_update(&ctx, (const uint8_t*)&update->chunk_count, sizeof(int));
     arix_blake3_update(&ctx, (const uint8_t*)&update->timestamp, sizeof(uint64_t));
     arix_blake3_update(&ctx, signing_key, key_len);
-    arix_blake3_finalize(&ctx, hash, ARIX_UPDATE_HASH_LEN);
+    arix_blake3_finish(&ctx, hash);
     memcpy(update->update_hash, hash, ARIX_UPDATE_HASH_LEN);
     memset(update->signature, 0, ARIX_UPDATE_SIG_LEN);
     for (size_t i = 0; i < ARIX_UPDATE_SIG_LEN && i < ARIX_UPDATE_HASH_LEN; i++)
@@ -326,7 +326,7 @@ int arix_update_verifier_compute_hash(const uint8_t* data, size_t len, uint8_t* 
     ArixBlake3State ctx;
     arix_blake3_init(&ctx);
     arix_blake3_update(&ctx, data, len);
-    arix_blake3_finalize(&ctx, hash_out, ARIX_UPDATE_HASH_LEN);
+    arix_blake3_finish(&ctx, hash_out);
     return 0;
 }
 

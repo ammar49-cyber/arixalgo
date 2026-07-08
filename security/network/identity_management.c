@@ -124,7 +124,7 @@ int arix_identity_tls_verify(const char* hostname, const uint8_t* cert_der, size
     ArixBlake3State ctx;
     arix_blake3_init(&ctx);
     arix_blake3_update(&ctx, cert_der, cert_len);
-    arix_blake3_finalize(&ctx, hash, ARIX_CERT_FINGERPRINT_LEN);
+    arix_blake3_finish(&ctx, hash);
     int non_zero = 0;
     for (size_t i = 0; i < ARIX_CERT_FINGERPRINT_LEN; i++)
         if (hash[i]) non_zero = 1;

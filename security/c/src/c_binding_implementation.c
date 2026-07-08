@@ -12,7 +12,7 @@ int arix_c_hash_blake3(const uint8_t* data, size_t len, uint8_t* out, size_t out
     ArixBlake3State ctx;
     arix_blake3_init(&ctx);
     arix_blake3_update(&ctx, data, len);
-    arix_blake3_finalize(&ctx, out, out_len);
+    arix_blake3_finish(&ctx, out);
     return 0;
 }
 

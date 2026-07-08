@@ -84,7 +84,7 @@ int arix_code_tamper_init(ArixCodeTamperDetector* ctd, const void* addr, size_t 
     ctd->code_addr=addr; ctd->code_size=size; ctd->enabled=1;
     ArixBlake3State ctx; arix_blake3_init(&ctx);
     arix_blake3_update(&ctx,(const uint8_t*)addr,size);
-    arix_blake3_finalize(&ctx,ctd->baseline_hash,32);
+    arix_blake3_finish(&ctx,ctd->baseline_hash);
     g_ct_region_count=0;
     return 0;
 }
@@ -94,7 +94,7 @@ int arix_code_tamper_check(ArixCodeTamperDetector* ctd) {
     uint8_t current[32];
     ArixBlake3State ctx; arix_blake3_init(&ctx);
     arix_blake3_update(&ctx,(const uint8_t*)ctd->code_addr,ctd->code_size);
-    arix_blake3_finalize(&ctx,current,32);
+    arix_blake3_finish(&ctx,current);
     return memcmp(current,ctd->baseline_hash,32)==0?0:1;
 }
 
@@ -104,7 +104,7 @@ int arix_code_tamper_add_region(const void* addr, size_t size) {
     r->addr = addr; r->size = size; r->active = 1;
     ArixBlake3State ctx; arix_blake3_init(&ctx);
     arix_blake3_update(&ctx,(const uint8_t*)addr,size);
-    arix_blake3_finalize(&ctx,r->hash,32);
+    arix_blake3_finish(&ctx,r->hash);
     g_ct_region_count++;
     return 0;
 }
@@ -122,7 +122,7 @@ int arix_code_tamper_check_all(void) {
         uint8_t current[32];
         ArixBlake3State ctx; arix_blake3_init(&ctx);
         arix_blake3_update(&ctx,(const uint8_t*)g_ct_regions[i].addr,g_ct_regions[i].size);
-        arix_blake3_finalize(&ctx,current,32);
+        arix_blake3_finish(&ctx,current);
         if (memcmp(current,g_ct_regions[i].hash,32)!=0) violations++;
     }
     return violations;
@@ -462,7 +462,7 @@ int arix_fs_integrity_watch(ArixFSIntegrity* fsi, const char* path) {
     if (f) {
         fseek(f,0,SEEK_END); long sz=ftell(f); fseek(f,0,SEEK_SET);
         uint8_t* buf=(uint8_t*)malloc(sz);
-        if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,fsi->hashes[fsi->count],32); free(buf); }
+        if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,fsi->hashes[fsi->count]); free(buf); }
         fclose(f);
     }
     fsi->count++;
@@ -478,7 +478,7 @@ int arix_fs_integrity_scan(ArixFSIntegrity* fsi) {
         if (f) {
             fseek(f,0,SEEK_END); long sz=ftell(f); fseek(f,0,SEEK_SET);
             uint8_t* buf=(uint8_t*)malloc(sz);
-            if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,current,32); free(buf); }
+            if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,current); free(buf); }
             fclose(f);
             if (memcmp(current,fsi->hashes[i],32)!=0) violations++;
         }
@@ -923,7 +923,7 @@ int arix_toctou_init(ArixTOCTOUDetector* td, const char* path) {
     if (f) {
         fseek(f,0,SEEK_END); long sz=ftell(f); fseek(f,0,SEEK_SET);
         uint8_t* buf=(uint8_t*)malloc(sz);
-        if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,td->baseline,32); free(buf); td->initialized=1; }
+        if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,td->baseline); free(buf); td->initialized=1; }
         fclose(f);
     }
     return 0;
@@ -936,7 +936,7 @@ int arix_toctou_check(ArixTOCTOUDetector* td, const char* path) {
     if (!f) return 1;
     fseek(f,0,SEEK_END); long sz=ftell(f); fseek(f,0,SEEK_SET);
     uint8_t* buf=(uint8_t*)malloc(sz);
-    if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,current,32); free(buf); }
+    if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,current); free(buf); }
     fclose(f);
     return memcmp(current,td->baseline,32)==0?0:1;
 }
@@ -968,7 +968,7 @@ int arix_ima_measure(const char* path, uint8_t hash[32]) {
     uint8_t* buf=(uint8_t*)malloc(sz);
     if (!buf) { fclose(f); return -1; }
     fread(buf,1,sz,f); fclose(f);
-    ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,hash,32);
+    ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,hash);
     free(buf);
     return 0;
 }
@@ -1291,7 +1291,7 @@ int arix_toctou_get_change_count(ArixTOCTOUDetector* td) {
     if (!f) return -1;
     fseek(f,0,SEEK_END); long sz=ftell(f); fseek(f,0,SEEK_SET);
     uint8_t* buf=(uint8_t*)malloc(sz);
-    if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,current,32); free(buf); }
+    if (buf) { fread(buf,1,sz,f); ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,current); free(buf); }
     fclose(f);
     return memcmp(current,td->baseline,32)==0?0:1;
 }
@@ -1461,7 +1461,7 @@ int arix_internal_verify_all_regions(void) {
         uint8_t current[32];
         ArixBlake3State ctx; arix_blake3_init(&ctx);
         arix_blake3_update(&ctx,(const uint8_t*)g_ct_regions[i].addr,g_ct_regions[i].size);
-        arix_blake3_finalize(&ctx,current,32);
+        arix_blake3_finish(&ctx,current);
         if (memcmp(current,g_ct_regions[i].hash,32)!=0) violations++;
     }
     return violations;
@@ -1549,7 +1549,7 @@ int arix_fs_integrity_verify_with_report(char* buffer, size_t size) {
             uint8_t* buf=(uint8_t*)malloc(sz);
             if (buf) {
                 fread(buf,1,sz,f);
-                ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finalize(&ctx,current,32);
+                ArixBlake3State ctx; arix_blake3_init(&ctx); arix_blake3_update(&ctx,buf,sz); arix_blake3_finish(&ctx,current);
                 free(buf);
                 if (memcmp(current,g_fsi_watched_hashes[i],32)!=0) violations++;
             }
