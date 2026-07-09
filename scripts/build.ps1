@@ -25,15 +25,15 @@ $cmakeArgs = @(
 )
 
 if ($Python) {
-    $cmakeArgs += "-DARIX_BUILD_PYTHON=ON"
+    $cmakeArgs += "-DSNEPPX_BUILD_PYTHON=ON"
 } else {
-    $cmakeArgs += "-DARIX_BUILD_PYTHON=OFF"
+    $cmakeArgs += "-DSNEPPX_BUILD_PYTHON=OFF"
 }
 
-$cmakeArgs += "-DARIX_BUILD_TESTS=$(if ($Tests) { 'ON' } else { 'OFF' })"
-$cmakeArgs += "-DARIX_BUILD_BENCHMARKS=$(if ($Benchmarks) { 'ON' } else { 'OFF' })"
-$cmakeArgs += "-DARIX_USE_LTO=$(if ($LTO) { 'ON' } else { 'OFF' })"
-$cmakeArgs += "-DARIX_USE_ASAN=$(if ($Asan) { 'ON' } else { 'OFF' })"
+$cmakeArgs += "-DSNEPPX_BUILD_TESTS=$(if ($Tests) { 'ON' } else { 'OFF' })"
+$cmakeArgs += "-DSNEPPX_BUILD_BENCHMARKS=$(if ($Benchmarks) { 'ON' } else { 'OFF' })"
+$cmakeArgs += "-DSNEPPX_USE_LTO=$(if ($LTO) { 'ON' } else { 'OFF' })"
+$cmakeArgs += "-DSNEPPX_USE_ASAN=$(if ($Asan) { 'ON' } else { 'OFF' })"
 
 Write-Host "Configuring..." -ForegroundColor Cyan
 & cmake @cmakeArgs @RootDir
