@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(cognitive_processing_system VERSION 0.7.8 LANGUAGES C CXX ASM)
+project(cognitive_processing_system VERSION 0.8.2 LANGUAGES C CXX ASM_MASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
