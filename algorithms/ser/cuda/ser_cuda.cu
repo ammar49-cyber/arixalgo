@@ -137,3 +137,143 @@ __global__ void combine_from_experts_kernel(
     
     float result = 0.0f;
     for (int k = 0; k < top_k; k++) {
+        int expert = expert_indices[token_idx * top_k + k];
+        if (expert < 0) continue;
+        float weight = __half2float(gating_weights[token_idx * top_k + k]);
+        result += weight * __half2float(expert_outputs[(expert * total_tokens + token_idx) * dim + d]);
+    }
+    output[token_idx * dim + d] = __float2half_rn(result);
+}
+
+SNEPPX_CudaError sneppx_cuda_combine_from_experts(
+    SNEPPX_CudaStream_t stream,
+    half* output, const half* expert_outputs,
+    const int* expert_indices, const half* gating_weights,
+    const int* expert_counts,
+    int total_tokens, int num_experts, int dim, int top_k
+) {
+    if (!output || !expert_outputs || !expert_indices || !gating_weights) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    combine_from_experts_kernel<<<total_tokens, dim, 0, stream>>>(
+        output, expert_outputs, expert_indices, gating_weights,
+        expert_counts, total_tokens, num_experts, dim, top_k
+    );
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// Load balancing loss
+__global__ void load_balancing_loss_kernel(
+    const float* expert_counts, const float* router_prob,
+    float* loss, int num_experts, float beta
+) {
+    int tid = threadIdx.x;
+    float local_loss = 0.0f;
+    float total_count = 0.0f;
+    
+    for (int i = tid; i < num_experts; i += blockDim.x) {
+        total_count += expert_counts[i];
+    }
+    total_count = sneppx_warp_reduce_sum(total_count);
+    
+    if (total_count == 0.0f) total_count = 1.0f;
+    
+    for (int i = tid; i < num_experts; i += blockDim.x) {
+        float f_i = expert_counts[i] / total_count;
+        float p_i = router_prob[i];
+        local_loss += f_i * p_i;
+    }
+    local_loss = sneppx_warp_reduce_sum(local_loss);
+    
+    if (tid == 0) {
+        *loss = beta * (float)num_experts * local_loss;
+    }
+}
+
+SNEPPX_CudaError sneppx_cuda_load_balancing_loss(
+    SNEPPX_CudaStream_t stream,
+    const float* expert_counts, const float* router_prob,
+    float* loss, int num_experts, float beta
+) {
+    if (!expert_counts || !router_prob || !loss) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    load_balancing_loss_kernel<<<1, 256, 0, stream>>>(expert_counts, router_prob, loss, num_experts, beta);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// Fused MoE forward (simplified single-pass implementation)
+SNEPPX_CudaError sneppx_cuda_fused_moe_forward(
+    SNEPPX_CudaStream_t stream,
+    const SNEPPX_FusedMoEParams* params
+) {
+    if (!params || !params->input || !params->output || !params->expert_weights) {
+        return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    }
+    
+    int total_tokens = params->batch_size * params->seq_len;
+    
+    half *expert_inputs, *expert_outputs, *gating_weights;
+    int *expert_indices, *expert_counts;
+    
+    cudaMallocAsync(&gating_weights, total_tokens * params->top_k * sizeof(half), stream);
+    cudaMallocAsync(&expert_indices, total_tokens * params->top_k * sizeof(int), stream);
+    cudaMallocAsync(&expert_counts, params->num_experts * sizeof(int), stream);
+    cudaMallocAsync(&expert_inputs, params->num_experts * params->expert_capacity * params->dim * sizeof(half), stream);
+    cudaMallocAsync(&expert_outputs, params->num_experts * params->expert_capacity * params->hidden_dim * sizeof(half), stream);
+    
+    cudaMemsetAsync(expert_counts, 0, params->num_experts * sizeof(int), stream);
+    
+    // 1) Gating
+    sneppx_cuda_topk_gating(stream, params->router_weights == nullptr ? nullptr : params->router_weights,
+                           expert_indices, gating_weights,
+                           total_tokens, params->num_experts, params->top_k);
+    
+    // 2) Count tokens per expert
+    auto count_kernel = [] __global__ (const int* idx, int* cnt, int t, int k, int n) {
+        int i = threadIdx.x + blockIdx.x * blockDim.x;
+        if (i < t * k) {
+            int e = idx[i];
+            if (e >= 0 && e < n) atomicAdd(&cnt[e], 1);
+        }
+    };
+    count_kernel<<<(total_tokens * params->top_k + 255) / 256, 256, 0, stream>>>(
+        expert_indices, expert_counts, total_tokens, params->top_k, params->num_experts
+    );
+    
+    // 3) Dispatch
+    sneppx_cuda_dispatch_to_experts(stream, params->input, expert_inputs,
+                                   expert_indices, expert_counts,
+                                   total_tokens, params->num_experts,
+                                   params->expert_capacity, params->dim);
+    
+    // 4) Expert compute (GEMM per expert)
+    for (int e = 0; e < params->num_experts; e++) {
+        cublasHandle_t handle = sneppx_cublas_get_handle();
+        cublasSetStream(handle, stream);
+        
+        float one = 1.0f, zero = 0.0f;
+        cublasGemmEx(
+            handle, CUBLAS_OP_N, CUBLAS_OP_N,
+            params->hidden_dim, params->expert_capacity, params->dim,
+            &one,
+            &params->expert_weights[e * params->hidden_dim * params->dim], CUDA_R_16F, params->hidden_dim,
+            &expert_inputs[e * params->expert_capacity * params->dim], CUDA_R_16F, params->expert_capacity,
+            &zero,
+            &expert_outputs[e * params->expert_capacity * params->hidden_dim], CUDA_R_16F, params->expert_capacity,
+            CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP
+        );
+    }
+    
+    // 5) Combine
+    sneppx_cuda_combine_from_experts(stream, params->output, expert_outputs,
+                                    expert_indices, gating_weights,
+                                    expert_counts, total_tokens, params->num_experts,
+                                    params->hidden_dim, params->top_k);
+    
+    cudaFreeAsync(gating_weights, stream);
+    cudaFreeAsync(expert_indices, stream);
+    cudaFreeAsync(expert_counts, stream);
+    cudaFreeAsync(expert_inputs, stream);
+    cudaFreeAsync(expert_outputs, stream);
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
