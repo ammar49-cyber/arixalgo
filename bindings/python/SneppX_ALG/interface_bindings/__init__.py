@@ -264,6 +264,13 @@ from .benchmark import (
     BenchmarkConfig, BenchmarkResult, BenchmarkSuite,
     run_benchmark_cli,
 )
+from .vision_transformers import (
+    PatchEmbedding, ViTBlock, VisionTransformer,
+    vit_tiny_patch16_224, vit_small_patch16_224, vit_base_patch16_224,
+    vit_large_patch16_224, vit_huge_patch14_224,
+    MAE, mae_base, mae_large, mae_huge,
+    create_vision_model,
+)
 from .benchmarks import (
     BenchmarkConfig, BenchmarkResult, BenchmarkSuite, BenchmarkTimer,
     MemoryTracker, run_benchmarks,
@@ -373,9 +380,13 @@ __all__ = [
     'multi_teacher_distillation_loss', 'ensemble_teacher_distillation',
     'OnlineDistillation', 'DistillationPruner',
     'distill_bert', 'distill_gpt',
+    # vision transformers
+    'PatchEmbedding', 'ViTBlock', 'VisionTransformer',
+    'vit_tiny_patch16_224', 'vit_small_patch16_224', 'vit_base_patch16_224',
+    'vit_large_patch16_224', 'vit_huge_patch14_224',
+    'MAE', 'mae_base', 'mae_large', 'mae_huge',
+    'create_vision_model',
     # benchmarks
-    'BenchmarkConfig', 'BenchmarkResult', 'BenchmarkSuite', 'BenchmarkTimer',
-    'MemoryTracker', 'run_benchmarks',
     # train (C++ backend)
     'Trainer', 'TrainConfig',
     'CppOptimizer', 'CppSGD', 'CppAdam', 'CppAdamW',

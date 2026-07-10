@@ -717,6 +717,17 @@ def unsqueeze(tensor: Tensor, dim: int) -> Tensor:
     return Tensor.from_numpy(out.astype(np.float32))
 
 
+def flatten(tensor: Tensor, start_dim: int = 1, end_dim: int = -1) -> Tensor:
+    """Flatten a tensor from start_dim to end_dim."""
+    x = np.asarray(tensor.data, dtype=np.float64)
+    if end_dim < 0:
+        end_dim = x.ndim + end_dim + 1
+    shape = x.shape
+    new_shape = shape[:start_dim] + (np.prod(shape[start_dim:end_dim+1]),) + shape[end_dim+1:]
+    out = x.reshape(new_shape)
+    return Tensor.from_numpy(out.astype(np.float32))
+
+
 def pad(
     input: Tensor,
     pad: Tuple[int, ...],
