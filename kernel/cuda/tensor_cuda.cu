@@ -764,6 +764,34 @@ SNEPPX_CudaError sneppx_cuda_device_synchronize() {
 extern "C" {
 #endif
 
+#if defined(SNEPPX_USE_NVTX) && defined(__CUDACC__)
+#include <nvtx3/nvToolsExt.h>
+
+void sneppx_nvtx_range_push(const char* name) {
+    nvtxRangePushA(name);
+}
+
+void sneppx_nvtx_range_pop() {
+    nvtxRangePop();
+}
+
+#else
+/* Software fallback: use the profiler range stack */
+#include "../../include/neural_core/kernel/profiler.h"
+
+void sneppx_nvtx_range_push(const char* name) {
+    SNEPPX_range_push(name);
+}
+
+void sneppx_nvtx_range_pop() {
+    SNEPPX_range_pop();
+}
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
 void sneppx_nvtx_range_push(const char* name) {
     // NVTX would be used here if available
     (void)name;
