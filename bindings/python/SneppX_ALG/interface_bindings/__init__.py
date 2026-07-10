@@ -256,9 +256,17 @@ from .distillation import (
     OnlineDistillation, DistillationPruner,
     distill_bert, distill_gpt,
 )
+from .benchmarking import (
+    BenchmarkConfig, BenchmarkSuite, BenchmarkTimer, MemoryTracker,
+    BenchmarkResult,
+)
 from .benchmark import (
     BenchmarkConfig, BenchmarkResult, BenchmarkSuite,
     run_benchmark_cli,
+)
+from .benchmarks import (
+    BenchmarkConfig, BenchmarkResult, BenchmarkSuite, BenchmarkTimer,
+    MemoryTracker, run_benchmarks,
 )
 from .train import (
     Trainer,
@@ -352,12 +360,11 @@ __all__ = [
     'center_crop', 'random_crop', 'five_crop', 'ten_crop',
     'IMAGENET_TRAIN_TRANSFORMS', 'IMAGENET_EVAL_TRANSFORMS',
     'CIFAR10_TRAIN_TRANSFORMS', 'CIFAR10_EVAL_TRANSFORMS',
-    # pruning
+# pruning
     'magnitude_prune', 'l1_channel_prune', 'taylor_pruning', 'global_magnitude_prune',
     'movement_pruning', 'soft_pruning',
     'compute_sparsity', 'count_parameters', 'print_pruning_summary',
     'apply_pruning_mask', 'recover_pruned_weights',
-    'distillation_loss', 'prune_and_distill',
     'distillation_loss', 'prune_and_distill',
     'find_winning_ticket', 'rewrite_weights',
     # distillation
@@ -366,9 +373,9 @@ __all__ = [
     'multi_teacher_distillation_loss', 'ensemble_teacher_distillation',
     'OnlineDistillation', 'DistillationPruner',
     'distill_bert', 'distill_gpt',
-    # benchmark
-    'BenchmarkConfig', 'BenchmarkResult', 'BenchmarkSuite',
-    'run_benchmark_cli',
+    # benchmarks
+    'BenchmarkConfig', 'BenchmarkResult', 'BenchmarkSuite', 'BenchmarkTimer',
+    'MemoryTracker', 'run_benchmarks',
     # train (C++ backend)
     'Trainer', 'TrainConfig',
     'CppOptimizer', 'CppSGD', 'CppAdam', 'CppAdamW',
