@@ -275,6 +275,23 @@ from .benchmarks import (
     BenchmarkConfig, BenchmarkResult, BenchmarkSuite, BenchmarkTimer,
     MemoryTracker, run_benchmarks,
 )
+from .llama_models import (
+    # LLaMA
+    LlamaRMSNorm, LlamaRotaryEmbedding, apply_rotary_pos_emb, rotate_half,
+    LlamaAttention, LlamaMLP, LlamaDecoderLayer, LlamaModel, LlamaForCausalLM,
+    # Mistral
+    MistralAttention, MistralMLP, MistralDecoderLayer, MistralModel, MistralForCausalLM,
+    # Qwen2
+    Qwen2Attention, Qwen2MLP, Qwen2DecoderLayer, Qwen2Model, Qwen2ForCausalLM,
+    # DeepSeek V2
+    DeepSeekV2Attention, DeepSeekV2MLP, DeepSeekV2DecoderLayer, DeepSeekV2Model, DeepSeekV2ForCausalLM,
+    # Configs
+    LLAMA_CONFIGS, MISTRAL_CONFIGS, QWEN2_CONFIGS, DEEPSEEK_V2_CONFIGS,
+    get_model_config, create_model, create_llama_model, create_mistral_model,
+    create_qwen2_model, create_deepseek_v2_model,
+    # Weight loading
+    load_hf_weights, convert_hf_llama_weights,
+)
 from .train import (
     Trainer,
     TrainConfig,
@@ -387,6 +404,21 @@ __all__ = [
     'MAE', 'mae_base', 'mae_large', 'mae_huge',
     'create_vision_model',
     # benchmarks
+    # llama models
+    'LlamaRMSNorm', 'LlamaRotaryEmbedding', 'apply_rotary_pos_emb', 'rotate_half',
+    'LlamaAttention', 'LlamaMLP', 'LlamaDecoderLayer', 'LlamaModel', 'LlamaForCausalLM',
+    # Mistral
+    'MistralAttention', 'MistralMLP', 'MistralDecoderLayer', 'MistralModel', 'MistralForCausalLM',
+    # Qwen2
+    'Qwen2Attention', 'Qwen2MLP', 'Qwen2DecoderLayer', 'Qwen2Model', 'Qwen2ForCausalLM',
+    # DeepSeek V2
+    'DeepSeekV2Attention', 'DeepSeekV2MLP', 'DeepSeekV2DecoderLayer', 'DeepSeekV2Model', 'DeepSeekV2ForCausalLM',
+    # Configs
+    'LLAMA_CONFIGS', 'MISTRAL_CONFIGS', 'QWEN2_CONFIGS', 'DEEPSEEK_V2_CONFIGS',
+    'get_model_config', 'create_model', 'create_llama_model', 'create_mistral_model',
+    'create_qwen2_model', 'create_deepseek_v2_model',
+    # Weight loading
+    'load_hf_weights', 'convert_hf_llama_weights',
     # train (C++ backend)
     'Trainer', 'TrainConfig',
     'CppOptimizer', 'CppSGD', 'CppAdam', 'CppAdamW',

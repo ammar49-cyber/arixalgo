@@ -452,6 +452,22 @@ def kl_divergence(p: np.ndarray, q: np.ndarray, axis: int = -1) -> np.ndarray:
     return np.sum(p * (np.log(p + 1e-12) - np.log(q + 1e-12)), axis=axis)
 
 
+def rope(x: np.ndarray, cos: np.ndarray, sin: np.ndarray) -> np.ndarray:
+    """Apply rotary position embedding."""
+    # x: [..., seq_len, head_dim]
+    # cos, sin: [..., seq_len, head_dim]
+    x1 = x[..., :x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2:]
+    return np.concatenate([x1 * cos - x2 * sin, x1 * sin + x2 * cos], axis=-1)
+
+
+def apply_rotary_pos_emb(q: np.ndarray, k: np.ndarray, cos: np.ndarray, sin: np.ndarray) -> tuple:
+    """Apply rotary position embedding to q and k."""
+    q_embed = rope(q, cos, sin)
+    k_embed = rope(k, cos, sin)
+    return q_embed, k_embed
+
+
 def gelu(x: np.ndarray) -> np.ndarray:
     """GELU activation: x * 0.5 * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))"""
     return x * 0.5 * (1.0 + np.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * x ** 3)))
