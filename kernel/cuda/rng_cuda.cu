@@ -334,3 +334,172 @@ SNEPPX_CudaError sneppx_cuda_xavier_uniform_f32(
     float gain = sneppx_calculate_gain(act);
     int numel = rows * cols;
     int block = 256;
+    int grid = (numel + block - 1) / block;
+    xavier_uniform_kernel<<<grid, block, 0, stream>>>(rng->states, output, rng->num_states, numel, gain, (float)rows, (float)cols);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+__global__ void xavier_normal_kernel(
+    curandStatePhilox4_32_10_t* states, float* output,
+    int num_states, int numel, float std_val
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= numel) return;
+    curandStatePhilox4_32_10_t local_state = sneppx_get_rng_state(states, num_states);
+    float val = curand_normal(&local_state) * std_val;
+    sneppx_write_rng_state(states, num_states, local_state);
+    output[idx] = val;
+}
+
+SNEPPX_CudaError sneppx_cuda_xavier_normal_f32(
+    SNEPPX_CudaStream_t stream, SNEPPX_CudaRNG* rng,
+    float* output, int rows, int cols, SNEPPX_ActivationType act
+) {
+    if (!rng || !output) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    float gain = sneppx_calculate_gain(act);
+    float std_val = gain * sqrtf(2.0f / (rows + cols));
+    int numel = rows * cols;
+    int block = 256;
+    int grid = (numel + block - 1) / block;
+    xavier_normal_kernel<<<grid, block, 0, stream>>>(rng->states, output, rng->num_states, numel, std_val);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+SNEPPX_CudaError sneppx_cuda_kaiming_uniform_f32(
+    SNEPPX_CudaStream_t stream, SNEPPX_CudaRNG* rng,
+    float* output, int rows, int cols, SNEPPX_ActivationType act
+) {
+    if (!rng || !output) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    float gain = sneppx_calculate_gain(act);
+    float fan_in = (float)rows;
+    float bound = gain * sqrtf(3.0f / fan_in);
+    int numel = rows * cols;
+    int block = 256;
+    int grid = (numel + block - 1) / block;
+    xavier_uniform_kernel<<<grid, block, 0, stream>>>(rng->states, output, rng->num_states, numel, gain, fan_in, (float)cols);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+SNEPPX_CudaError sneppx_cuda_kaiming_normal_f32(
+    SNEPPX_CudaStream_t stream, SNEPPX_CudaRNG* rng,
+    float* output, int rows, int cols, SNEPPX_ActivationType act
+) {
+    if (!rng || !output) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    float gain = sneppx_calculate_gain(act);
+    float std_val = gain / sqrtf((float)rows);
+    int numel = rows * cols;
+    int block = 256;
+    int grid = (numel + block - 1) / block;
+    xavier_normal_kernel<<<grid, block, 0, stream>>>(rng->states, output, rng->num_states, numel, std_val);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// Dropout forward: generate mask, scale, and apply
+__global__ void dropout_fwd_kernel(
+    curandStatePhilox4_32_10_t* states,
+    const half* input, half* output, half* mask,
+    int num_states, int numel, float p
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= numel) return;
+    curandStatePhilox4_32_10_t local_state = sneppx_get_rng_state(states, num_states);
+    float scale = 1.0f / (1.0f - p);
+    float keep = (curand_uniform(&local_state) >= p) ? scale : 0.0f;
+    sneppx_write_rng_state(states, num_states, local_state);
+    float inp = __half2float(input[idx]);
+    output[idx] = __float2half_rn(inp * keep);
+    if (mask) mask[idx] = __float2half_rn(keep > 0.0f ? 1.0f : 0.0f);
+}
+
+SNEPPX_CudaError sneppx_cuda_dropout_fwd(
+    SNEPPX_CudaStream_t stream, SNEPPX_CudaRNG* rng,
+    const half* input, half* output, half* mask,
+    int numel, float p
+) {
+    if (!rng || !input || !output) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    if (p < 0.0f || p >= 1.0f) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    int block = 256;
+    int grid = (numel + block - 1) / block;
+    dropout_fwd_kernel<<<grid, block, 0, stream>>>(rng->states, input, output, mask, rng->num_states, numel, p);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// Batch RNG
+SNEPPX_CudaError sneppx_cuda_batch_rng_create(
+    SNEPPX_BatchRNG** brng, int batch_size,
+    unsigned long long base_seed, SNEPPX_CudaStream_t stream
+) {
+    if (!brng || batch_size <= 0) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    SNEPPX_BatchRNG* b = (SNEPPX_BatchRNG*)malloc(sizeof(SNEPPX_BatchRNG));
+    if (!b) return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    SNEPPX_CudaError err = sneppx_cuda_rng_create(&b->rng, batch_size * 256, base_seed, stream);
+    if (err != SNEPPX_CUDA_SUCCESS) { free(b); return err; }
+    b->batch_size = batch_size;
+    b->base_seed = base_seed;
+    *brng = b;
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_cuda_batch_rng_destroy(SNEPPX_BatchRNG* brng) {
+    if (!brng) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    sneppx_cuda_rng_destroy(brng->rng);
+    free(brng);
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_cuda_batch_rand_normal(
+    SNEPPX_CudaStream_t stream, SNEPPX_BatchRNG* brng,
+    half** outputs, int batch_size, int numel_per_batch,
+    float mean, float std
+) {
+    if (!brng || !outputs) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    for (int b = 0; b < min(batch_size, brng->batch_size); b++) {
+        SNEPPX_CudaError err = sneppx_cuda_rand_normal_f16(
+            stream, brng->rng, outputs[b], numel_per_batch, mean, std
+        );
+        if (err != SNEPPX_CUDA_SUCCESS) return err;
+    }
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+// Permutation (Fisher-Yates on GPU)
+__global__ void rand_permutation_kernel(
+    curandStatePhilox4_32_10_t* states,
+    int* output, int num_states, int n
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
+    curandStatePhilox4_32_10_t local_state = sneppx_get_rng_state(states, num_states);
+    
+    // Initialize identity
+    output[idx] = idx;
+    __syncthreads();
+    
+    // Fisher-Yates shuffle (each thread swaps its element with a random later element)
+    // Simplified: each thread picks a random swap partner
+    if (idx < n - 1) {
+        int j = idx + (int)(curand_uniform(&local_state) * (n - idx));
+        if (j >= n) j = n - 1;
+        int tmp = output[idx];
+        output[idx] = output[j];
+        output[j] = tmp;
+    }
+    sneppx_write_rng_state(states, num_states, local_state);
+}
+
+SNEPPX_CudaError sneppx_cuda_rand_permutation(
+    SNEPPX_CudaStream_t stream, SNEPPX_CudaRNG* rng,
+    int* output, int n
+) {
+    if (!rng || !output || n <= 0) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    int block = 256;
+    int grid = (n + block - 1) / block;
+    rand_permutation_kernel<<<grid, block, 0, stream>>>(rng->states, output, rng->num_states, n);
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
