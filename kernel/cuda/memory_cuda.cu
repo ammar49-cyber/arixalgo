@@ -181,3 +181,186 @@ SNEPPX_CudaError sneppx_mempool_alloc(
         return SNEPPX_CUDA_SUCCESS;
     }
     
+    // Pool exhausted, fallback to direct allocation
+    return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+}
+
+SNEPPX_CudaError sneppx_mempool_free(
+    SNEPPX_MemoryPool* pool,
+    void* ptr
+) {
+    if (!pool || !ptr) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    for (int i = 0; i < pool->num_blocks; i++) {
+        if (pool->blocks[i] == ptr) {
+            pool->block_used[i] = 0;
+            pool->total_used -= pool->block_sizes[i];
+            return SNEPPX_CUDA_SUCCESS;
+        }
+    }
+    
+    // Not in pool, free directly
+    cudaFree(ptr);
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_mempool_reset(SNEPPX_MemoryPool* pool) {
+    if (!pool) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    for (int i = 0; i < pool->num_blocks; i++) {
+        pool->block_used[i] = 0;
+    }
+    pool->total_used = 0;
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_mempool_get_stats(
+    const SNEPPX_MemoryPool* pool,
+    SNEPPX_MemoryPoolStats* stats
+) {
+    if (!pool || !stats) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    stats->total_capacity = pool->total_capacity;
+    stats->total_used = pool->total_used;
+    stats->num_blocks = pool->num_blocks;
+    
+    int free_count = 0;
+    for (int i = 0; i < pool->num_blocks; i++) {
+        if (!pool->block_used[i]) free_count++;
+    }
+    stats->num_free_blocks = free_count;
+    stats->device_id = pool->device_id;
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+// ============================================================================
+// Stream Pool Implementation
+// ============================================================================
+
+SNEPPX_CudaError sneppx_stream_pool_create(
+    SNEPPX_StreamPool** pool,
+    int num_streams,
+    unsigned int stream_flags
+) {
+    if (!pool || num_streams <= 0) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    SNEPPX_StreamPool* p = (SNEPPX_StreamPool*)malloc(sizeof(SNEPPX_StreamPool));
+    if (!p) return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    
+    p->num_streams = 0;
+    p->max_streams = num_streams;
+    p->streams = (cudaStream_t*)calloc(num_streams, sizeof(cudaStream_t));
+    p->stream_available = (int*)calloc(num_streams, sizeof(int));
+    
+    if (!p->streams || !p->stream_available) {
+        free(p->streams);
+        free(p->stream_available);
+        free(p);
+        return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    }
+    
+    for (int i = 0; i < num_streams; i++) {
+        cudaError_t err = cudaStreamCreateWithFlags(&p->streams[i], stream_flags);
+        if (err != cudaSuccess) break;
+        p->stream_available[i] = 1;
+        p->num_streams++;
+    }
+    
+    *pool = p;
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_stream_pool_destroy(SNEPPX_StreamPool* pool) {
+    if (!pool) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    for (int i = 0; i < pool->num_streams; i++) {
+        cudaStreamDestroy(pool->streams[i]);
+    }
+    
+    free(pool->streams);
+    free(pool->stream_available);
+    free(pool);
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_stream_pool_acquire(
+    SNEPPX_StreamPool* pool,
+    cudaStream_t* stream
+) {
+    if (!pool || !stream) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    // Round-robin: find first available stream
+    for (int i = 0; i < pool->num_streams; i++) {
+        if (pool->stream_available[i]) {
+            pool->stream_available[i] = 0;
+            *stream = pool->streams[i];
+            return SNEPPX_CUDA_SUCCESS;
+        }
+    }
+    
+    // All busy, create temporary stream
+    cudaError_t err = cudaStreamCreate(stream);
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+SNEPPX_CudaError sneppx_stream_pool_release(
+    SNEPPX_StreamPool* pool,
+    cudaStream_t stream
+) {
+    if (!pool || !stream) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    for (int i = 0; i < pool->num_streams; i++) {
+        if (pool->streams[i] == stream) {
+            pool->stream_available[i] = 1;
+            return SNEPPX_CUDA_SUCCESS;
+        }
+    }
+    
+    // Not in pool, destroy directly
+    cudaStreamDestroy(stream);
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_stream_pool_sync_all(SNEPPX_StreamPool* pool) {
+    if (!pool) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    for (int i = 0; i < pool->num_streams; i++) {
+        cudaStreamSynchronize(pool->streams[i]);
+    }
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+// ============================================================================
+// Event Pool Implementation
+// ============================================================================
+
+SNEPPX_CudaError sneppx_event_pool_create(
+    SNEPPX_EventPool** pool,
+    int num_events,
+    unsigned int event_flags
+) {
+    if (!pool || num_events <= 0) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    SNEPPX_EventPool* p = (SNEPPX_EventPool*)malloc(sizeof(SNEPPX_EventPool));
+    if (!p) return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    
+    p->num_events = 0;
+    p->max_events = num_events;
+    p->events = (cudaEvent_t*)calloc(num_events, sizeof(cudaEvent_t));
+    p->event_available = (int*)calloc(num_events, sizeof(int));
+    
+    if (!p->events || !p->event_available) {
+        free(p->events);
+        free(p->event_available);
+        free(p);
+        return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    }
+    
+    for (int i = 0; i < num_events; i++) {
+        cudaError_t err = cudaEventCreateWithFlags(&p->events[i], event_flags);
+        if (err != cudaSuccess) break;
+        p->event_available[i] = 1;
