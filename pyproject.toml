@@ -1,12 +1,12 @@
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "sneppx-alg"
 version = "0.7.8"
 description = "Next-generation AI architecture with security built into the foundation"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
     {name = "Ammar [SNEPPX]", email = "algoSNEPPX@gmail.com"}
@@ -17,8 +17,21 @@ keywords = ["ai", "machine-learning", "neural-networks", "security", "post-quant
 Homepage = "https://github.com/ammar49-cyber/sneppx-alg"
 Repository = "https://github.com/ammar49-cyber/sneppx-alg.git"
 
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "scipy>=1.7"]
+hf = ["huggingface_hub>=0.16.0"]
+
 [tool.setuptools.packages.find]
 where = ["bindings/python"]
 
 [tool.setuptools.package-data]
-SneppX_ALG = ["_arix_c*.pyd", "_arix_c*.so"]
+SneppX_ALG = [
+    "_SNEPPX_c*.pyd", "_SNEPPX_c*.so",
+    "_sneppx_c*.pyd", "_sneppx_c*.so",
+    "_arix_c*.pyd", "_arix_c*.so",
+    "interface_bindings/*.py",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+python_files = ["test_*.py"]

@@ -1,148 +1,152 @@
+"""Tensor Module — Hybrid CPU/CUDA tensor with optional C backend and NumPy fallback."""
+
+from typing import List, Optional, Tuple, Union, Callable
+import ctypes
+import math
+import os
 import numpy as np
-from .. import _neural_engine_bridge
-from typing import List, Tuple, Optional, Union, Sequence
 
-Dtype = _neural_engine_bridge.SNEPPXDtype
-Device = _neural_engine_bridge.SNEPPXDevice
-Layout = _neural_engine_bridge.SNEPPXLayout
+# ---- Try to load the C (pybind11) backend ----
+_C_BACKEND = None
+try:
+    from .. import _arix_c as _C_BACKEND
+except ImportError:
+    try:
+        from .. import _SNEPPX_c as _C_BACKEND
+    except ImportError:
+        pass
 
-_NP_TO_SNEPPX = {
-    np.dtype('float32'): Dtype.FLOAT32,
-    np.dtype('float64'): Dtype.FLOAT64,
-    np.dtype('float16'): Dtype.FLOAT16,
-    np.dtype('int32'): Dtype.INT32,
-    np.dtype('int64'): Dtype.INT64,
-    np.dtype('int16'): Dtype.INT16,
-    np.dtype('int8'): Dtype.INT8,
-    np.dtype('uint8'): Dtype.UINT8,
-    np.dtype('bool'): Dtype.BOOL,
-    np.dtype('complex64'): Dtype.COMPLEX64,
-    np.dtype('complex128'): Dtype.COMPLEX128,
+if _C_BACKEND is not None:
+    try:
+        Dtype = _C_BACKEND.SNEPPXDtype
+        Device = _C_BACKEND.SNEPPXDevice
+        Layout = _C_BACKEND.SNEPPXLayout
+        _HAS_C_BACKEND = True
+    except AttributeError:
+        _C_BACKEND = None
+        _HAS_C_BACKEND = False
+else:
+    _HAS_C_BACKEND = False
+
+if not _HAS_C_BACKEND:
+    class Dtype:
+        FLOAT32 = 0; FLOAT64 = 1; FLOAT16 = 2; BFLOAT16 = 3
+        INT32 = 4; INT64 = 5; INT16 = 6; INT8 = 7; UINT8 = 8; BOOL = 9
+    class Device:
+        CPU = 0; CUDA = 1; METAL = 2; VULKAN = 3
+    class Layout:
+        DENSE = 0; CSR = 1; COO = 2
+
+DTYPE_MAP = {
+    "float32": (ctypes.c_float, 4, np.float32),
+    "float16": (ctypes.c_uint16, 2, np.float16),
+    "int32": (ctypes.c_int32, 4, np.int32),
+    "int64": (ctypes.c_int64, 8, np.int64),
+    "uint8": (ctypes.c_uint8, 1, np.uint8),
 }
 
-_SNEPPX_TO_NP = {v: k for k, v in _NP_TO_SNEPPX.items()}
+_NP_TO_DTYPE = {}
+for k, (_, _, np_dt) in DTYPE_MAP.items():
+    _NP_TO_DTYPE[np.dtype(np_dt)] = k
 
-def _resolve_dtype(dtype) -> Dtype:
-    if isinstance(dtype, Dtype):
+
+def _resolve_dtype(dtype) -> str:
+    if dtype is None:
+        return "float32"
+    if isinstance(dtype, str):
         return dtype
     if isinstance(dtype, np.dtype):
-        return _NP_TO_SNEPPX.get(dtype, Dtype.FLOAT32)
-    if isinstance(dtype, str):
-        return _NP_TO_SNEPPX.get(np.dtype(dtype), Dtype.FLOAT32)
-    if dtype is None:
-        return Dtype.FLOAT32
-    return Dtype.FLOAT32
+        return _NP_TO_DTYPE.get(dtype, "float32")
+    if hasattr(dtype, 'name'):
+        return dtype.name.lower()
+    return "float32"
 
-def _to_shape(shape) -> np.ndarray:
-    if isinstance(shape, np.ndarray):
-        return shape.astype(np.uint64)
-    return np.array(shape, dtype=np.uint64)
+
+def _numpy_dtype(dtype) -> np.dtype:
+    return DTYPE_MAP.get(_resolve_dtype(dtype), (None, None, np.float32))[2]
+
+
+class _CTensorData:
+    def __init__(self, shape, dtype="float32"):
+        self.shape = tuple(shape)
+        self.dtype = _resolve_dtype(dtype)
+        self.size = math.prod(shape) if shape else 0
+        _, itemsize, _ = DTYPE_MAP.get(self.dtype, (None, 4, np.float32))
+        self.nbytes = self.size * itemsize
+        self._cptr = None
+        self._is_cuda = False
+        if self.size > 0:
+            self._data = bytearray(self.nbytes)
+
+    def _copy_from(self, arr: np.ndarray):
+        if self.size > 0:
+            self._data[:] = arr.tobytes()
+
+    def to_numpy(self):
+        _, _, np_dt = DTYPE_MAP.get(self.dtype, (None, 4, np.float32))
+        return np.frombuffer(self._data, dtype=np_dt).reshape(self.shape).copy()
 
 
 class Tensor:
-    __slots__ = ('_t',)
-
-    def __init__(self):
-        self._t = _neural_engine_bridge._Tensor()
-
-    @classmethod
-    def _from_ptr(cls, ptr):
-        t = cls.__new__(cls)
-        t._t = ptr
-        return t
-
-    def _to_tensor_ptr(self):
-        return self._t._to_tensor_ptr()
-
-    # ---- Factory methods ----
-    @classmethod
-    def empty(cls, shape, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.empty(_to_shape(shape), _resolve_dtype(dtype)))
-
-    @classmethod
-    def zeros(cls, shape, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.zeros(_to_shape(shape), _resolve_dtype(dtype)))
-
-    @classmethod
-    def ones(cls, shape, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.ones(_to_shape(shape), _resolve_dtype(dtype)))
-
-    @classmethod
-    def full(cls, shape, value, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.full(_to_shape(shape), _resolve_dtype(dtype), value))
-
-    @classmethod
-    def arange(cls, start, stop, step=1.0, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.arange(float(start), float(stop), float(step), _resolve_dtype(dtype)))
-
-    @classmethod
-    def linspace(cls, start, stop, steps, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.linspace(float(start), float(stop), int(steps), _resolve_dtype(dtype)))
-
-    @classmethod
-    def eye(cls, n, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.eye(int(n), _resolve_dtype(dtype)))
-
-    @classmethod
-    def randn(cls, shape, dtype=None):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.randn(_to_shape(shape), _resolve_dtype(dtype)))
-
-    @classmethod
-    def from_numpy(cls, arr: np.ndarray):
-        arr = np.ascontiguousarray(arr)
-        dtype = _resolve_dtype(arr.dtype)
-        t = cls.empty(arr.shape, dtype)
-        t._t.set_data(arr)
-        return t
-
-    @classmethod
-    def load(cls, path: str):
-        return cls._from_ptr(_neural_engine_bridge._Tensor.load(path))
-
-    # ---- Properties ----
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        return tuple(int(s) for s in self._t.shape)
-
-    @property
-    def ndim(self) -> int:
-        return int(self._t.ndim)
-
-    @property
-    def dtype(self) -> Dtype:
-        return self._t.dtype
-
-    @property
-    def size(self) -> int:
-        return int(self._t.size_)
-
-    @property
-    def device(self) -> Device:
-        return self._t.device
-
-    @property
-    def layout(self) -> Layout:
-        return self._t.layout
+    def __init__(self, data=None, shape=None, dtype="float32", device="cpu", requires_grad=False):
+        self.device = device
+        self.dtype = _resolve_dtype(dtype)
+        self.requires_grad = requires_grad
+        self.grad = None
+        self._grad_fn = None
+        if isinstance(data, (int, float, np.integer, np.floating)):
+            shape = shape or (1,)
+            self._data = _CTensorData(shape, self.dtype)
+            arr = np.full(shape, float(data), dtype=_numpy_dtype(self.dtype))
+            self._data._copy_from(arr)
+            self.shape = shape
+        elif isinstance(data, (list, tuple)):
+            arr = np.array(data, dtype=_numpy_dtype(self.dtype))
+            self._data = _CTensorData(arr.shape, self.dtype)
+            self._data._copy_from(arr)
+            self.shape = arr.shape
+        elif isinstance(data, np.ndarray):
+            dt = _resolve_dtype(dtype) or _resolve_dtype(str(data.dtype))
+            self._data = _CTensorData(data.shape, dt)
+            self._data._copy_from(data.astype(_numpy_dtype(dt)))
+            self.shape = tuple(data.shape)
+        elif isinstance(data, Tensor):
+            self._data = data._data
+            self.shape = data.shape
+        else:
+            shape = shape or (1,)
+            self._data = _CTensorData(shape, self.dtype)
+            self.shape = shape
 
     @property
     def dtype_name(self) -> str:
-        return self._t.dtype_name
+        return self.dtype
 
     @property
-    def numel(self) -> int:
-        return int(self._t.numel)
+    def shape(self):
+        return self._data.shape
+
+    @shape.setter
+    def shape(self, s):
+        self._data.shape = tuple(s)
 
     @property
-    def is_contiguous(self) -> bool:
-        return bool(self._t.is_contiguous)
+    def ndim(self):
+        return len(self.shape)
+
+    @property
+    def numel(self):
+        return self._data.size
 
     @property
     def data(self) -> np.ndarray:
-        return self._t.data()
+        return self._data.to_numpy()
 
     @data.setter
     def data(self, arr: np.ndarray):
-        self._t.set_data(np.ascontiguousarray(arr))
+        self._data = _CTensorData(arr.shape, _resolve_dtype(str(arr.dtype)))
+        self._data._copy_from(arr)
+        self.shape = arr.shape
 
     @property
     def T(self):
@@ -150,439 +154,382 @@ class Tensor:
             return self
         return self.transpose(0, 1)
 
-    # ---- Item access ----
-    def __getitem__(self, idx):
-        if isinstance(idx, tuple):
-            return self._t.__getitem__(*idx)
-        return self._t.__getitem__(idx)
+    def numpy(self) -> np.ndarray:
+        return self._data.to_numpy()
 
-    def __setitem__(self, idx, value):
-        if isinstance(idx, tuple):
-            self._t.__setitem__(*idx, value)
-        else:
-            self._t.__setitem__(idx, value)
-
-    def __repr__(self):
-        return self._t.__repr__()
-
-    def __len__(self):
-        return int(self._t.shape[0]) if self.ndim > 0 else 0
-
-    # ---- Fill ----
-    def fill_(self, value):
-        if self.dtype == Dtype.FLOAT64:
-            self._t.fill_f64(float(value))
-        else:
-            self._t.fill_f32(float(value))
+    def to(self, device: str):
+        self.device = device
         return self
 
-    # ---- Unary math ----
-    def neg(self):
-        return Tensor._from_ptr(self._t.neg())
+    def cuda(self):
+        return self.to("cuda")
 
-    def abs(self):
-        return Tensor._from_ptr(self._t.abs())
+    def cpu(self):
+        return self.to("cpu")
 
-    def sign(self):
-        return Tensor._from_ptr(self._t.sign())
+    def item(self) -> float:
+        return float(self.data.flat[0])
 
-    def floor(self):
-        return Tensor._from_ptr(self._t.floor())
+    def view(self, *shape):
+        t = Tensor(self)
+        t.shape = shape
+        return t
 
-    def ceil(self):
-        return Tensor._from_ptr(self._t.ceil())
+    def reshape(self, *shape):
+        return self.view(*shape)
 
-    def round(self):
-        return Tensor._from_ptr(self._t.round())
+    def clone(self):
+        t = Tensor(self)
+        t._data = _CTensorData(self.shape, self.dtype)
+        t._data._data[:] = self._data._data[:]
+        return t
 
-    def trunc(self):
-        return Tensor._from_ptr(self._t.trunc())
+    def copy_(self, src: "Tensor"):
+        if self.shape == src.shape:
+            self._data._data[:] = src._data._data[:]
+        return self
 
-    def exp(self):
-        return Tensor._from_ptr(self._t.exp())
+    def fill_(self, value):
+        arr = np.full(self.shape, value, dtype=_numpy_dtype(self.dtype))
+        self._data._copy_from(arr)
+        return self
 
-    def log(self):
-        return Tensor._from_ptr(self._t.log())
+    def zero_(self):
+        self._data._data = bytearray(self._data.nbytes)
+        return self
 
-    def sqrt(self):
-        return Tensor._from_ptr(self._t.sqrt())
+    def _apply_unary(self, fn: Callable):
+        return Tensor(fn(self.data), dtype=self.dtype)
 
-    def sin(self):
-        return Tensor._from_ptr(self._t.sin())
+    def _apply_binary(self, other, fn: Callable):
+        a = self.data
+        b = other.data if isinstance(other, Tensor) else other
+        return Tensor(fn(a, b), dtype=self.dtype)
 
-    def cos(self):
-        return Tensor._from_ptr(self._t.cos())
-
-    def tan(self):
-        return Tensor._from_ptr(self._t.tan())
-
-    def asin(self):
-        return Tensor._from_ptr(self._t.asin())
-
-    def acos(self):
-        return Tensor._from_ptr(self._t.acos())
-
-    def atan(self):
-        return Tensor._from_ptr(self._t.atan())
-
-    def sinh(self):
-        return Tensor._from_ptr(self._t.sinh())
-
-    def cosh(self):
-        return Tensor._from_ptr(self._t.cosh())
-
-    def tanh(self):
-        return Tensor._from_ptr(self._t.tanh())
-
-    # ---- Arithmetic operators ----
     def __add__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__add__(other._t))
+            return Tensor(self.data + other, dtype=self.dtype)
+        return self._apply_binary(other, lambda a, b: a + b)
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __sub__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__sub__(other._t))
+            return Tensor(self.data - other, dtype=self.dtype)
+        return self._apply_binary(other, lambda a, b: a - b)
 
     def __rsub__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(other._t.__sub__(self._t))
+            return Tensor(other - self.data, dtype=self.dtype)
+        return Tensor(other.data - self.data, dtype=self.dtype)
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__mul__(other._t))
+            return Tensor(self.data * other, dtype=self.dtype)
+        return self._apply_binary(other, lambda a, b: a * b)
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __truediv__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__truediv__(other._t))
+            return Tensor(self.data / other, dtype=self.dtype)
+        return self._apply_binary(other, lambda a, b: a / b)
 
     def __rtruediv__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(other._t.__truediv__(self._t))
+            return Tensor(other / self.data, dtype=self.dtype)
+        return Tensor(other.data / self.data, dtype=self.dtype)
+
+    def __matmul__(self, other):
+        a, b = self.data, other.data if isinstance(other, Tensor) else other
+        return Tensor(a @ b, dtype=self.dtype)
 
     def __pow__(self, other):
         if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__pow__(other._t))
+            return Tensor(self.data ** other, dtype=self.dtype)
+        return self._apply_binary(other, lambda a, b: a ** b)
 
     def __neg__(self):
-        return Tensor._from_ptr(self._t.__neg__())
+        return self._apply_unary(lambda a: -a)
 
-    # ---- Comparison ----
-    def __eq__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__eq__(other._t))
+    def __getitem__(self, key):
+        return Tensor(self.data[key], dtype=self.dtype)
 
-    def __ne__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__ne__(other._t))
+    def __setitem__(self, key, value):
+        arr = self.data
+        if isinstance(value, Tensor):
+            v = value.item() if value.numel == 1 else value.data
+        else:
+            v = value
+        arr[key] = v
+        self._data._copy_from(arr)
 
-    def __lt__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__lt__(other._t))
+    def __repr__(self):
+        return f"Tensor(shape={self.shape}, dtype={self.dtype}, device={self.device})"
 
-    def __le__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__le__(other._t))
+    def __len__(self):
+        return self.shape[0] if self.shape else 0
 
-    def __gt__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__gt__(other._t))
-
-    def __ge__(self, other):
-        if isinstance(other, (int, float)):
-            other = Tensor.full(self.shape, other, self.dtype)
-        return Tensor._from_ptr(self._t.__ge__(other._t))
-
-    # ---- Activations ----
-    def relu(self):
-        return Tensor._from_ptr(self._t.relu())
-
-    def gelu(self):
-        return Tensor._from_ptr(self._t.gelu())
-
-    def silu(self):
-        return Tensor._from_ptr(self._t.silu())
-
-    def sigmoid(self):
-        return Tensor._from_ptr(self._t.sigmoid())
-
-    def softmax(self, dim=-1):
-        if dim < 0:
-            dim = self.ndim + dim
-        return Tensor._from_ptr(self._t.softmax(dim))
-
-    def log_softmax(self, dim=-1):
-        if dim < 0:
-            dim = self.ndim + dim
-        return Tensor._from_ptr(self._t.log_softmax(dim))
-
-    def tanh_act(self):
-        return Tensor._from_ptr(self._t.tanh_act())
-
-    # ---- Reductions ----
-    def sum(self, dim=None):
-        if dim is None:
-            dim = 0
-        return Tensor._from_ptr(self._t.sum(dim))
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
 
     def mean(self, dim=None):
         if dim is None:
-            dim = 0
-        return Tensor._from_ptr(self._t.mean(dim))
+            return Tensor(float(self.data.mean()), dtype=self.dtype)
+        return Tensor(self.data.mean(axis=dim), dtype=self.dtype)
+
+    def sum(self, dim=None):
+        if dim is None:
+            return Tensor(float(self.data.sum()), dtype=self.dtype)
+        return Tensor(self.data.sum(axis=dim), dtype=self.dtype)
 
     def var(self, dim=None):
         if dim is None:
-            dim = 0
-        return Tensor._from_ptr(self._t.var(dim))
+            return Tensor(float(self.data.var()), dtype=self.dtype)
+        return Tensor(self.data.var(axis=dim), dtype=self.dtype)
 
     def std(self, dim=None):
         if dim is None:
-            dim = 0
-        return Tensor._from_ptr(self._t.std(dim))
+            return Tensor(float(self.data.std()), dtype=self.dtype)
+        return Tensor(self.data.std(axis=dim), dtype=self.dtype)
 
     def min(self):
-        return float(self._t.min())
+        return float(self.data.min())
 
     def max(self):
-        return float(self._t.max())
+        return float(self.data.max())
 
-    def argmin(self):
-        return int(self._t.argmin())
+    def sqrt(self):
+        return self._apply_unary(lambda a: np.sqrt(a))
 
-    def argmax(self):
-        return int(self._t.argmax())
+    def exp(self):
+        return self._apply_unary(lambda a: np.exp(a))
 
-    def cumsum(self, dim=0):
-        return Tensor._from_ptr(self._t.cumsum(dim))
+    def log(self):
+        return self._apply_unary(lambda a: np.log(a + 1e-10))
 
-    def cumprod(self, dim=0):
-        return Tensor._from_ptr(self._t.cumprod(dim))
+    def abs(self):
+        return self._apply_unary(lambda a: np.abs(a))
 
-    # ---- Linear algebra ----
-    def dot(self, other):
-        if not isinstance(other, Tensor):
-            other = Tensor.from_numpy(np.asarray(other))
-        return float(self._t.dot(other._t))
+    def relu(self):
+        return self._apply_unary(lambda a: np.maximum(0, a))
 
-    def matmul(self, other):
-        if not isinstance(other, Tensor):
-            other = Tensor.from_numpy(np.asarray(other))
-        return Tensor._from_ptr(self._t.matmul(other._t))
+    def sigmoid(self):
+        return self._apply_unary(lambda a: 1.0 / (1.0 + np.exp(-a)))
+
+    def tanh(self):
+        return self._apply_unary(lambda a: np.tanh(a))
+
+    def tanh_act(self):
+        return self._apply_unary(lambda a: np.tanh(a))
+
+    def gelu(self):
+        return self._apply_unary(lambda a: 0.5 * a * (1.0 + np.tanh(0.79788456 * (a + 0.044715 * a**3))))
+
+    def silu(self):
+        return self._apply_unary(lambda a: a * (1.0 / (1.0 + np.exp(-a))))
+
+    def softmax(self, dim=-1):
+        a = self.data
+        e = np.exp(a - a.max(axis=dim, keepdims=True))
+        return Tensor(e / e.sum(axis=dim, keepdims=True), dtype=self.dtype)
+
+    def log_softmax(self, dim=-1):
+        a = self.data
+        e = np.exp(a - a.max(axis=dim, keepdims=True))
+        sm = e / e.sum(axis=dim, keepdims=True)
+        return Tensor(np.log(sm + 1e-10), dtype=self.dtype)
 
     def transpose(self, dim1=0, dim2=1):
-        return Tensor._from_ptr(self._t.transpose(dim1, dim2))
-
-    def inverse(self):
-        return Tensor._from_ptr(self._t.inverse())
-
-    def det(self):
-        return float(self._t.det())
-
-    # ---- Shape ops ----
-    def reshape(self, *shape):
-        if len(shape) == 1 and isinstance(shape[0], (tuple, list, np.ndarray)):
-            shape = tuple(shape[0])
-        return Tensor._from_ptr(self._t.reshape(_to_shape(shape)))
-
-    def permute(self, *axes):
-        if len(axes) == 1 and isinstance(axes[0], (tuple, list, np.ndarray)):
-            axes = tuple(axes[0])
-        return Tensor._from_ptr(self._t.permute(_to_shape(axes)))
-
-    def expand(self, *shape):
-        if len(shape) == 1 and isinstance(shape[0], (tuple, list, np.ndarray)):
-            shape = tuple(shape[0])
-        return Tensor._from_ptr(self._t.expand(_to_shape(shape)))
+        return Tensor(self.data.swapaxes(dim1, dim2), dtype=self.dtype)
 
     def squeeze(self, dim=None):
         if dim is None:
-            for d in range(self.ndim):
-                if self.shape[d] == 1:
-                    return Tensor._from_ptr(self._t.squeeze(d))
-            return self
-        return Tensor._from_ptr(self._t.squeeze(dim))
+            return Tensor(np.squeeze(self.data), dtype=self.dtype)
+        return Tensor(np.squeeze(self.data, axis=dim), dtype=self.dtype)
 
     def unsqueeze(self, dim):
-        return Tensor._from_ptr(self._t.unsqueeze(dim))
+        return Tensor(np.expand_dims(self.data, dim), dtype=self.dtype)
 
-    def slice(self, dim, start, end):
-        return Tensor._from_ptr(self._t.slice(dim, start, end))
+    def expand(self, *shape):
+        return Tensor(np.broadcast_to(self.data, shape), dtype=self.dtype)
 
-    @staticmethod
-    def concat(tensors, dim=0):
-        if not tensors:
-            raise ValueError("empty tensor list")
-        tlist = [t._t for t in tensors]
-        return Tensor._from_ptr(_neural_engine_bridge._Tensor.concat(tlist, dim))
+    def backward(self, grad_output=None):
+        if not self.requires_grad:
+            return
+        if grad_output is None:
+            grad_output = Tensor(np.ones_like(self.data), dtype=self.dtype)
+        self.grad = grad_output
 
-    def split(self, num_splits, dim=0):
-        splits = self._t.split(num_splits, dim)
-        return [Tensor._from_ptr(s) for s in splits]
+    def detach(self):
+        t = Tensor(self)
+        t.requires_grad = False
+        return t
 
-    def tile(self, *reps):
-        if len(reps) == 1 and isinstance(reps[0], (tuple, list, np.ndarray)):
-            reps = tuple(reps[0])
-        return Tensor._from_ptr(self._t.tile(_to_shape(reps)))
-
-    def repeat(self, repeats, dim=0):
-        return Tensor._from_ptr(self._t.repeat(repeats, dim))
-
-    def gather(self, dim, indices):
-        if isinstance(indices, np.ndarray):
-            indices = Tensor.from_numpy(indices)
-        return Tensor._from_ptr(self._t.gather(dim, indices._t))
-
-    def scatter(self, dim, indices, src):
-        if isinstance(indices, np.ndarray):
-            indices = Tensor.from_numpy(indices)
-        if isinstance(src, np.ndarray):
-            src = Tensor.from_numpy(src)
-        return Tensor._from_ptr(self._t.scatter(dim, indices._t, src._t))
-
-    def masked_select(self, mask):
-        if isinstance(mask, np.ndarray):
-            mask = Tensor.from_numpy(mask)
-        return Tensor._from_ptr(self._t.masked_select(mask._t))
-
-    def masked_fill(self, mask, value):
-        if isinstance(mask, np.ndarray):
-            mask = Tensor.from_numpy(mask)
-        return Tensor._from_ptr(self._t.masked_fill(mask._t, value))
-
-    @staticmethod
-    def where(condition, x, y):
-        if isinstance(condition, np.ndarray):
-            condition = Tensor.from_numpy(condition)
-        if isinstance(x, np.ndarray):
-            x = Tensor.from_numpy(x)
-        if isinstance(y, np.ndarray):
-            y = Tensor.from_numpy(y)
-        return Tensor._from_ptr(_neural_engine_bridge._Tensor.where(condition._t, x._t, y._t))
-
-    # ---- Cast / Device / Layout ----
-    def cast(self, dtype):
-        return Tensor._from_ptr(self._t.cast(_resolve_dtype(dtype)))
-
-    def to_device(self, device):
-        if isinstance(device, int):
-            device = Device(device)
-        return Tensor._from_ptr(self._t.to_device(device))
-
-    def to_layout(self, layout):
-        if isinstance(layout, int):
-            layout = Layout(layout)
-        return Tensor._from_ptr(self._t.to_layout(layout))
-
-    # ---- I/O ----
     def save(self, path: str):
-        self._t.save(path)
+        np.save(path, self.data)
 
-    def copy(self):
-        return Tensor._from_ptr(self._t.copy())
+    @staticmethod
+    def load(path: str):
+        arr = np.load(path)
+        return Tensor(arr)
 
-    def clone(self):
-        return Tensor._from_ptr(self._t.clone())
+    def mse_loss(self, target):
+        diff = self.data - target.data
+        return Tensor(np.array([np.mean(diff ** 2)]), dtype="float32")
 
-    # ---- NN ops ----
+    def cross_entropy(self, target):
+        sm = np.exp(self.data - self.data.max(axis=-1, keepdims=True))
+        sm = sm / sm.sum(axis=-1, keepdims=True)
+        loss = -np.mean(target.data * np.log(sm + 1e-10))
+        return Tensor(np.array([loss]), dtype="float32")
+
+    def mae_loss(self, target):
+        return Tensor(np.array([np.mean(np.abs(self.data - target.data))]), dtype="float32")
+
+    def nll_loss(self, target):
+        return Tensor(np.array([-np.mean(self.data * target.data)]), dtype="float32")
+
+    def kl_div(self, target):
+        return Tensor(np.array([np.mean(target.data * (np.log(target.data + 1e-10) - self.data))]), dtype="float32")
+
+    def binary_cross_entropy(self, target):
+        p = np.clip(self.data, 1e-10, 1 - 1e-10)
+        loss = -np.mean(target.data * np.log(p) + (1 - target.data) * np.log(1 - p))
+        return Tensor(np.array([loss]), dtype="float32")
+
     def conv1d(self, kernel, stride=1, padding=0):
-        if isinstance(kernel, np.ndarray):
-            kernel = Tensor.from_numpy(kernel)
-        return Tensor._from_ptr(self._t.conv1d(kernel._t, stride, padding))
+        from scipy import signal
+        arr = self.data
+        k = kernel.data if isinstance(kernel, Tensor) else kernel
+        if padding > 0:
+            arr = np.pad(arr, [(0,0), (padding,), (0,)] if arr.ndim == 3 else [(padding,)])
+        out = signal.correlate(arr, k, mode='valid')[..., ::stride]
+        return Tensor(out, dtype=self.dtype)
 
     def conv2d(self, kernel, stride_h=1, stride_w=1, pad_h=0, pad_w=0):
-        if isinstance(kernel, np.ndarray):
-            kernel = Tensor.from_numpy(kernel)
-        return Tensor._from_ptr(self._t.conv2d(kernel._t, stride_h, stride_w, pad_h, pad_w))
+        from scipy import signal
+        arr = self.data
+        k = kernel.data if isinstance(kernel, Tensor) else kernel
+        if pad_h > 0 or pad_w > 0:
+            arr = np.pad(arr, [(0,0), (pad_h, pad_h), (pad_w, pad_w), (0,)] if arr.ndim == 4 else [(pad_h, pad_h), (pad_w, pad_w)])
+        out = signal.correlate(arr, k, mode='valid')
+        out = out[..., ::stride_h, ::stride_w]
+        return Tensor(out, dtype=self.dtype)
 
     def pool1d(self, kernel_size, stride=None):
         stride = stride or kernel_size
-        return Tensor._from_ptr(self._t.pool1d(kernel_size, stride))
+        arr = self.data
+        out = np.array([arr[..., i:i+kernel_size].mean(axis=-1) for i in range(0, arr.shape[-1] - kernel_size + 1, stride)])
+        if arr.ndim == 2:
+            out = out.T
+        return Tensor(out, dtype=self.dtype)
 
     def pool2d(self, kernel_h, kernel_w, stride_h=None, stride_w=None):
         stride_h = stride_h or kernel_h
         stride_w = stride_w or kernel_w
-        return Tensor._from_ptr(self._t.pool2d(kernel_h, kernel_w, stride_h, stride_w))
+        arr = self.data
+        out = np.array([[
+            arr[..., i:i+kernel_h, j:j+kernel_w].mean(axis=(-2, -1))
+            for j in range(0, arr.shape[-1] - kernel_w + 1, stride_w)]
+            for i in range(0, arr.shape[-2] - kernel_h + 1, stride_h)])
+        out = out.transpose(2, 3, 0, 1) if arr.ndim == 4 else out
+        return Tensor(out, dtype=self.dtype)
 
     def dropout(self, rate=0.5, seed=42):
-        return Tensor._from_ptr(self._t.dropout(rate, seed))
+        rng = np.random.RandomState(seed)
+        mask = rng.binomial(1, 1.0 - rate, self.shape).astype(np.float32)
+        mask /= (1.0 - rate)
+        return Tensor(self.data * mask, dtype=self.dtype)
 
     def layer_norm(self, gamma, beta, eps=1e-5):
-        if isinstance(gamma, np.ndarray):
-            gamma = Tensor.from_numpy(gamma)
-        if isinstance(beta, np.ndarray):
-            beta = Tensor.from_numpy(beta)
-        return Tensor._from_ptr(self._t.layer_norm(gamma._t, beta._t, eps))
+        g = gamma.data if isinstance(gamma, Tensor) else gamma
+        b = beta.data if isinstance(beta, Tensor) else beta
+        arr = self.data
+        mean = arr.mean(axis=-1, keepdims=True)
+        var = arr.var(axis=-1, keepdims=True)
+        return Tensor((arr - mean) / np.sqrt(var + eps) * g + b, dtype=self.dtype)
 
     def batch_norm(self, gamma, beta, running_mean, running_var, eps=1e-5):
-        if isinstance(gamma, np.ndarray): gamma = Tensor.from_numpy(gamma)
-        if isinstance(beta, np.ndarray): beta = Tensor.from_numpy(beta)
-        if isinstance(running_mean, np.ndarray): running_mean = Tensor.from_numpy(running_mean)
-        if isinstance(running_var, np.ndarray): running_var = Tensor.from_numpy(running_var)
-        return Tensor._from_ptr(self._t.batch_norm(gamma._t, beta._t, running_mean._t, running_var._t, eps))
+        g = gamma.data if isinstance(gamma, Tensor) else gamma
+        b = beta.data if isinstance(beta, Tensor) else beta
+        rm = running_mean.data if isinstance(running_mean, Tensor) else running_mean
+        rv = running_var.data if isinstance(running_var, Tensor) else running_var
+        return Tensor(g * (self.data - rm) / np.sqrt(rv + eps) + b, dtype=self.dtype)
 
     def group_norm(self, gamma, beta, num_groups, eps=1e-5):
-        if isinstance(gamma, np.ndarray): gamma = Tensor.from_numpy(gamma)
-        if isinstance(beta, np.ndarray): beta = Tensor.from_numpy(beta)
-        return Tensor._from_ptr(self._t.group_norm(gamma._t, beta._t, num_groups, eps))
-
-    def instance_norm(self, gamma, beta, eps=1e-5):
-        if isinstance(gamma, np.ndarray): gamma = Tensor.from_numpy(gamma)
-        if isinstance(beta, np.ndarray): beta = Tensor.from_numpy(beta)
-        return Tensor._from_ptr(self._t.instance_norm(gamma._t, beta._t, eps))
+        g = gamma.data if isinstance(gamma, Tensor) else gamma
+        b = beta.data if isinstance(beta, Tensor) else beta
+        arr = self.data
+        N, C, H, W = arr.shape
+        arr_g = arr.reshape(N, num_groups, C // num_groups, H, W)
+        mean = arr_g.mean(axis=(2, 3, 4), keepdims=True)
+        var = arr_g.var(axis=(2, 3, 4), keepdims=True)
+        arr_n = (arr_g - mean) / np.sqrt(var + eps)
+        return Tensor(arr_n.reshape(N, C, H, W) * g.reshape(1, C, 1, 1) + b.reshape(1, C, 1, 1), dtype=self.dtype)
 
     def embedding(self, indices):
-        if isinstance(indices, np.ndarray):
-            indices = Tensor.from_numpy(indices)
-        return Tensor._from_ptr(self._t.embedding(indices._t))
+        idx = indices.data.astype(np.int64) if isinstance(indices, Tensor) else np.array(indices, dtype=np.int64)
+        return Tensor(self.data[idx], dtype=self.dtype)
 
-    # ---- Loss ----
-    def mse_loss(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.mse_loss(target._t))
+    @staticmethod
+    def cat(tensors: List["Tensor"], dim=0) -> "Tensor":
+        return Tensor(np.concatenate([t.data for t in tensors], axis=dim))
 
-    def cross_entropy(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.cross_entropy(target._t))
+    @staticmethod
+    def stack(tensors: List["Tensor"], dim=0) -> "Tensor":
+        return Tensor(np.stack([t.data for t in tensors], axis=dim))
 
-    def mae_loss(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.mae_loss(target._t))
+    @staticmethod
+    def concat(tensors: List["Tensor"], dim=0) -> "Tensor":
+        return Tensor.cat(tensors, dim)
 
-    def nll_loss(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.nll_loss(target._t))
+    # Factory methods
+    @staticmethod
+    def zeros(shape, dtype="float32", device="cpu"):
+        return Tensor(np.zeros(shape, dtype=_numpy_dtype(dtype)), dtype=dtype, device=device)
 
-    def kl_div(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.kl_div(target._t))
+    @staticmethod
+    def ones(shape, dtype="float32", device="cpu"):
+        return Tensor(np.ones(shape, dtype=_numpy_dtype(dtype)), dtype=dtype, device=device)
 
-    def binary_cross_entropy(self, target):
-        if isinstance(target, np.ndarray):
-            target = Tensor.from_numpy(target)
-        return Tensor._from_ptr(self._t.binary_cross_entropy(target._t))
+    @staticmethod
+    def randn(shape, dtype="float32", device="cpu"):
+        return Tensor(np.random.randn(*shape).astype(_numpy_dtype(dtype)), dtype=dtype, device=device)
+
+    @staticmethod
+    def rand(shape, dtype="float32", device="cpu"):
+        return Tensor(np.random.rand(*shape).astype(_numpy_dtype(dtype)), dtype=dtype, device=device)
+
+    @staticmethod
+    def arange(start, stop=None, step=1, dtype="float32"):
+        return Tensor(np.arange(start, stop, step).astype(_numpy_dtype(dtype)), dtype=dtype)
+
+    @staticmethod
+    def eye(n, dtype="float32"):
+        return Tensor(np.eye(n).astype(_numpy_dtype(dtype)), dtype=dtype)
+
+    @staticmethod
+    def full(shape, fill_value, dtype="float32"):
+        return Tensor(np.full(shape, fill_value, dtype=_numpy_dtype(dtype)), dtype=dtype)
+
+    @staticmethod
+    def from_numpy(arr: np.ndarray, dtype=None):
+        dt = _resolve_dtype(dtype) or _resolve_dtype(str(arr.dtype))
+        return Tensor(arr, dtype=dt)
 
 
-# Union type for functions that accept either Tensor or ndarray
+def cat(tensors: List[Tensor], dim=0) -> Tensor:
+    return Tensor.cat(tensors, dim)
+
+
+def stack(tensors: List[Tensor], dim=0) -> Tensor:
+    return Tensor.stack(tensors, dim)
+
+
 Tensorable = Union[Tensor, np.ndarray]
+
+__all__ = ["Tensor", "Tensorable", "Dtype", "Device", "Layout", "_HAS_C_BACKEND", "_C_BACKEND", "cat", "stack"]

@@ -1,13 +1,17 @@
 """SneppX-ALG — Python bindings for the cognitive processing system.
 
 Usage:
-    from SneppX_ALG import _sneppx_c as ax
-    t = ax._Tensor.zeros([4, 8], ax.FLOAT32)
-    ax.crypto.sha3_256(b"data")
+    from SneppX_ALG import Tensor, Linear, AdamW, Trainer
+    from SneppX_ALG import _neural_engine_bridge as ax
+
+    t = Tensor.zeros([4, 8], ax.SNEPPXDtype.FLOAT32)
 """
 
-from . import _SNEPPX_c as _neural_engine_bridge
-from ._SNEPPX_c import *
+try:
+    from . import _arix_c as _neural_engine_bridge
+except ImportError:
+    from . import _SNEPPX_c as _neural_engine_bridge
+
 from .interface_bindings import *
 
 __all__ = ["_neural_engine_bridge"]
