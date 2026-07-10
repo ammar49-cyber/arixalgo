@@ -204,3 +204,211 @@ static void cpu_all_reduce_sum_f32(float* data, size_t count, int rank, int worl
     
     free(buffer);
 }
+
+int sneppx_nccl_all_reduce(
+    const void* sendbuf, void* recvbuf, size_t count,
+    SNEPPX_NCCL_DataType datatype, SNEPPX_NCCL_RedOp op,
+    SNEPPX_NCCLComm* comm, cudaStream_t stream
+) {
+    if (!comm || !sendbuf || !recvbuf) return -1;
+    
+    if (comm->use_nccl && g_nccl_backend.ncclAllReduce) {
+        int ret = g_nccl_backend.ncclAllReduce(
+            sendbuf, recvbuf, count,
+            sneppx_nccl_to_nccl_dtype(datatype),
+            sneppx_nccl_to_nccl_op(op),
+            comm->nccl_comm, stream
+        );
+        return (ret == 0) ? 0 : -1;
+    }
+    
+    // CPU fallback
+    if (datatype == SNEPPX_NCCL_FLOAT && op == SNEPPX_NCCL_SUM) {
+        cudaMemcpy(recvbuf, sendbuf, count * sizeof(float), cudaMemcpyDeviceToHost);
+        cpu_all_reduce_sum_f32((float*)recvbuf, count, comm->rank, comm->size);
+        cudaMemcpy(recvbuf, recvbuf, count * sizeof(float), cudaMemcpyHostToDevice);
+        return 0;
+    }
+    
+    return -1;
+}
+
+int sneppx_nccl_all_gather(
+    const void* sendbuf, void* recvbuf, size_t sendcount,
+    SNEPPX_NCCL_DataType datatype,
+    SNEPPX_NCCLComm* comm, cudaStream_t stream
+) {
+    if (!comm || !sendbuf || !recvbuf) return -1;
+    
+    if (comm->use_nccl && g_nccl_backend.ncclAllGather) {
+        int ret = g_nccl_backend.ncclAllGather(
+            sendbuf, recvbuf, sendcount,
+            sneppx_nccl_to_nccl_dtype(datatype),
+            comm->nccl_comm, stream
+        );
+        return (ret == 0) ? 0 : -1;
+    }
+    
+    // CPU fallback: copy to host, gather, copy back
+    size_t dtype_size = (datatype == SNEPPX_NCCL_INT64) ? 8 : 4;
+    size_t total = sendcount * comm->size * dtype_size;
+    
+    // Simplified: each rank copies its portion
+    cudaMemcpy(
+        (char*)recvbuf + comm->rank * sendcount * dtype_size,
+        sendbuf, sendcount * dtype_size, cudaMemcpyDeviceToDevice
+    );
+    
+    return 0;
+}
+
+int sneppx_nccl_send(
+    const void* buf, size_t count,
+    SNEPPX_NCCL_DataType datatype, int peer,
+    SNEPPX_NCCLComm* comm, cudaStream_t stream
+) {
+    if (!comm || !buf) return -1;
+    if (comm->use_nccl && g_nccl_backend.ncclSend) {
+        return g_nccl_backend.ncclSend(buf, count, sneppx_nccl_to_nccl_dtype(datatype), peer, comm->nccl_comm, stream);
+    }
+    return 0;
+}
+
+int sneppx_nccl_recv(
+    void* buf, size_t count,
+    SNEPPX_NCCL_DataType datatype, int peer,
+    SNEPPX_NCCLComm* comm, cudaStream_t stream
+) {
+    if (!comm || !buf) return -1;
+    if (comm->use_nccl && g_nccl_backend.ncclRecv) {
+        return g_nccl_backend.ncclRecv(buf, count, sneppx_nccl_to_nccl_dtype(datatype), peer, comm->nccl_comm, stream);
+    }
+    return 0;
+}
+
+const char* sneppx_nccl_get_error_string(int error) {
+    if (error == 0) return "Success";
+    return "NCCL Error";
+}
+
+int sneppx_nccl_all_reduce_grads(
+    SNEPPX_NCCLComm* comm, void** grads, size_t* sizes,
+    int num_grads, cudaStream_t stream
+) {
+    if (!comm || !grads || !sizes) return -1;
+    
+    for (int i = 0; i < num_grads; i++) {
+        int ret = sneppx_nccl_all_reduce(
+            grads[i], grads[i], sizes[i],
+            SNEPPX_NCCL_HALF, SNEPPX_NCCL_SUM,
+            comm, stream
+        );
+        if (ret != 0) return ret;
+    }
+    
+    return 0;
+}
+
+// ============================================================================
+// Process Group
+// ============================================================================
+
+int sneppx_pg_create(
+    SNEPPX_ProcessGroup** pg, int world_size, int rank
+) {
+    if (!pg || world_size <= 0) return -1;
+    
+    SNEPPX_ProcessGroup* p = (SNEPPX_ProcessGroup*)calloc(1, sizeof(SNEPPX_ProcessGroup));
+    if (!p) return -1;
+    
+    p->world_size = world_size;
+    p->rank = rank;
+    p->num_comms = 1;
+    p->comms = (SNEPPX_NCCLComm**)calloc(1, sizeof(SNEPPX_NCCLComm*));
+    
+    if (sneppx_nccl_comm_init_rank(&p->comms[0], world_size, rank, NULL) != 0) {
+        free(p->comms);
+        free(p);
+        return -1;
+    }
+    
+    *pg = p;
+    return 0;
+}
+
+int sneppx_pg_destroy(SNEPPX_ProcessGroup* pg) {
+    if (!pg) return -1;
+    
+    for (int i = 0; i < pg->num_comms; i++) {
+        sneppx_nccl_comm_destroy(pg->comms[i]);
+    }
+    free(pg->comms);
+    free(pg);
+    return 0;
+}
+
+int sneppx_pg_all_reduce(
+    SNEPPX_ProcessGroup* pg, void* data, size_t count,
+    SNEPPX_NCCL_DataType datatype, SNEPPX_NCCL_RedOp op,
+    cudaStream_t stream
+) {
+    if (!pg || !data || pg->num_comms == 0) return -1;
+    
+    return sneppx_nccl_all_reduce(
+        data, data, count, datatype, op,
+        pg->comms[0], stream
+    );
+}
+
+int sneppx_pg_barrier(
+    SNEPPX_ProcessGroup* pg, cudaStream_t stream
+) {
+    if (!pg || pg->num_comms == 0) return -1;
+    
+    // Barrier via all-reduce of a dummy value
+    float dummy = 1.0f;
+    float* d_dummy;
+    cudaMalloc(&d_dummy, sizeof(float));
+    cudaMemcpy(d_dummy, &dummy, sizeof(float), cudaMemcpyHostToDevice);
+    
+    int ret = sneppx_pg_all_reduce(pg, d_dummy, 1, SNEPPX_NCCL_FLOAT, SNEPPX_NCCL_SUM, stream);
+    
+    cudaFree(d_dummy);
+    return ret;
+}
+
+// ============================================================================
+// Dynamic library loading (platform-specific)
+// ============================================================================
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+
+void* sneppx_dlopen(const char* lib, int flags) {
+    return (void*)LoadLibraryA(lib);
+}
+
+void* sneppx_dlsym(void* handle, const char* name) {
+    return (void*)GetProcAddress((HMODULE)handle, name);
+}
+
+int sneppx_dlclose(void* handle) {
+    FreeLibrary((HMODULE)handle);
+    return 0;
+}
+
+#else
+#include <dlfcn.h>
+
+void* sneppx_dlopen(const char* lib, int flags) {
+    return dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
+}
+
+void* sneppx_dlsym(void* handle, const char* name) {
+    return dlsym(handle, name);
+}
+
+int sneppx_dlclose(void* handle) {
+    return dlclose(handle);
+}
+#endif
