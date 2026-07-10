@@ -137,22 +137,34 @@ static void poly_frombytes(int16_t r[256], const uint8_t *in) {
 
 static void poly_compress(uint8_t *out, const int16_t a[256], int d) {
     int32_t f = (1 << 12) / KYBER_Q;
+    int out_idx = 0, shift = 0;
+    memset(out, 0, (256 * d + 7) / 8);
     for (int i = 0; i < 256; i++) {
         int32_t t = (a[i] * f + (1 << 11)) >> 12;
         t &= (1 << d) - 1;
-        int bit = i * d;
-        for (int b = 0; b < d; b++)
-            if (t & (1 << b)) out[bit / 8] |= (1 << (bit % 8 + b));
+        out[out_idx] |= (uint8_t)(t << shift);
+        int remaining = 8 - shift;
+        if (d > remaining) {
+            out[out_idx + 1] |= (uint8_t)(t >> remaining);
+            out_idx++;
+            shift = d - remaining;
+        } else {
+            shift += d;
+            if (shift == 8) { out_idx++; shift = 0; }
+        }
     }
 }
 
 static void poly_decompress(int16_t r[256], const uint8_t *in, int d) {
     int32_t f = (1 << d) / 2;
+    int in_idx = 0, bits = 0;
+    uint64_t buf = 0;
     for (int i = 0; i < 256; i++) {
-        int t = 0, bit = i * d;
-        for (int b = 0; b < d; b++)
-            if (in[(bit + b) / 8] & (1 << ((bit + b) % 8))) t |= (1 << b);
-        r[i] = (t * KYBER_Q + f) >> d;
+        while (bits < d) { buf |= ((uint64_t)in[in_idx++] << bits); bits += 8; }
+        int t = (int)(buf & ((1ULL << d) - 1));
+        buf >>= d;
+        bits -= d;
+        r[i] = (int16_t)((t * KYBER_Q + f) >> d);
     }
 }
 
@@ -216,59 +228,75 @@ int SNEPPX_kyber_keygen(uint8_t *pk, uint8_t *sk, int variant) {
 
 int SNEPPX_kyber_encaps(uint8_t *ct, uint8_t *ss, const uint8_t *pk, int variant) {
     if (!ct || !ss || !pk) return -1;
+    int du = (variant == 2) ? 10 : (variant == 3) ? 10 : 11;
+    int dv = (variant == 2) ? 3 : (variant == 3) ? 4 : 5;
+    int k = (variant == 2) ? 2 : (variant == 3) ? 3 : 4;
+    int u_compressed_bytes = k * 256 * du / 8;
+    int v_compressed_bytes = 256 * dv / 8;
     uint8_t coin[32], m[32];
     SNEPPX_random_bytes(coin, 32);
     SNEPPX_random_bytes(m, 32);
     int16_t mp[256];
     poly_frommsg(mp, m);
-    int16_t sp[KYBER_K * 256], ep[KYBER_K * 256], epp[256];
-    for (int i = 0; i < KYBER_K; i++) {
+    int16_t sp[4 * 256], ep[4 * 256], epp[256];
+    memset(sp, 0, sizeof(sp)); memset(ep, 0, sizeof(ep));
+    for (int i = 0; i < k; i++) {
         poly_getnoise(sp + i * 256, coin, i);
-        poly_getnoise(ep + i * 256, coin, KYBER_K + i);
+        poly_getnoise(ep + i * 256, coin, k + i);
     }
-    poly_getnoise(epp, coin, 2 * KYBER_K);
-    int16_t at[KYBER_K * KYBER_K * 256];
-    for (int i = 0; i < KYBER_K * KYBER_K; i++)
-        for (int j = 0; j < 256; j++) at[i * 256 + j] = rand() % KYBER_Q;
-    int16_t u[KYBER_K * 256], v[256];
-    for (int i = 0; i < KYBER_K; i++) {
+    poly_getnoise(epp, coin, 2 * k);
+    int16_t at[16 * 256];
+    memset(at, 0, sizeof(at));
+    for (int i = 0; i < k * k; i++)
+        for (int j = 0; j < 256; j++) at[i * 256 + j] = (int16_t)(rand() % KYBER_Q);
+    int16_t u[4 * 256], v[256];
+    memset(u, 0, sizeof(u)); memset(v, 0, sizeof(v));
+    for (int i = 0; i < k; i++) {
         int16_t t[256] = {0};
-        for (int j = 0; j < KYBER_K; j++)
-            poly_mul(t, at + (j * KYBER_K + i) * 256, sp + j * 256);
+        for (int j = 0; j < k; j++)
+            poly_mul(t, at + (j * k + i) * 256, sp + j * 256);
         poly_add(u + i * 256, t, ep + i * 256);
     }
-    int16_t pkpoly[KYBER_K * 256];
-    for (int i = 0; i < KYBER_K; i++)
+    int16_t pkpoly[4 * 256];
+    memset(pkpoly, 0, sizeof(pkpoly));
+    for (int i = 0; i < k; i++)
         poly_frombytes(pkpoly + i * 256, pk + i * 384);
-    for (int i = 0; i < KYBER_K; i++) {
+    for (int i = 0; i < k; i++) {
         int16_t t[256] = {0};
         poly_mul(t, pkpoly + i * 256, sp + i * 256);
         poly_add(v, v, t);
     }
     poly_add(v, v, epp);
     poly_add(v, v, mp);
-    for (int i = 0; i < KYBER_K; i++)
-        poly_tobytes(ct + i * 384, u + i * 256);
-    poly_compress(ct + KYBER_K * 384, v, 4);
+    for (int i = 0; i < k; i++)
+        poly_compress(ct + i * (256 * du / 8), u + i * 256, du);
+    poly_compress(ct + u_compressed_bytes, v, dv);
     memcpy(ss, m, 32);
+    (void)v_compressed_bytes;
     return 0;
 }
 
 int SNEPPX_kyber_decaps(uint8_t *ss, const uint8_t *ct, const uint8_t *sk, int variant) {
     if (!ss || !ct || !sk) return -1;
+    int du = (variant == 2) ? 10 : (variant == 3) ? 10 : 11;
+    int dv = (variant == 2) ? 3 : (variant == 3) ? 4 : 5;
+    int k = (variant == 2) ? 2 : (variant == 3) ? 3 : 4;
+    int u_compressed_bytes = k * 256 * du / 8;
     uint8_t pk[KYBER_PUBLICKEYBYTES];
     memcpy(pk, sk + 32, KYBER_PUBLICKEYBYTES);
-    int16_t u[KYBER_K * 256], v[256];
-    for (int i = 0; i < KYBER_K; i++)
-        poly_frombytes(u + i * 256, ct + i * 384);
-    poly_decompress(v, ct + KYBER_K * 384, 4);
-    int16_t s[KYBER_K * 256];
+    int16_t u[4 * 256], v[256];
+    memset(u, 0, sizeof(u)); memset(v, 0, sizeof(v));
+    for (int i = 0; i < k; i++)
+        poly_decompress(u + i * 256, ct + i * (256 * du / 8), du);
+    poly_decompress(v, ct + u_compressed_bytes, dv);
+    int16_t s[4 * 256];
+    memset(s, 0, sizeof(s));
     uint8_t seed[32];
     memcpy(seed, sk, 32);
-    for (int i = 0; i < KYBER_K; i++)
+    for (int i = 0; i < k; i++)
         poly_getnoise(s + i * 256, seed, i);
     int16_t m[256] = {0};
-    for (int i = 0; i < KYBER_K; i++) {
+    for (int i = 0; i < k; i++) {
         int16_t t[256] = {0};
         poly_mul(t, s + i * 256, u + i * 256);
         poly_sub(m, m, t);

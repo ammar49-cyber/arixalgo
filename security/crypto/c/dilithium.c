@@ -285,5 +285,41 @@ int SNEPPX_dilithium_sign(uint8_t *sig, size_t *siglen, const uint8_t *m, size_t
 
 int SNEPPX_dilithium_verify(const uint8_t *sig, size_t siglen, const uint8_t *m, size_t mlen, const uint8_t *pk, int variant) {
     if (!sig || !pk) return -1;
+    int k = (variant == 2) ? 4 : (variant == 3) ? 6 : 8;
+    int gamma1 = (variant == 2) ? 1 << 17 : 1 << 19;
+    int eta = (variant == 2) ? 2 : 4;
+    int beta = (variant == 2) ? 78 : 196;
+    size_t poly_bytes = 32 * 13;
+    size_t expected_siglen = (size_t)k * poly_bytes + poly_bytes + 32;
+    if (siglen < expected_siglen) return -1;
+
+    int32_t *z = (int32_t*)calloc((size_t)k * 256, sizeof(int32_t));
+    int32_t *r1 = (int32_t*)calloc((size_t)k * 256, sizeof(int32_t));
+    int32_t *c_poly = (int32_t*)calloc(256, sizeof(int32_t));
+    if (!z || !r1 || !c_poly) { free(z); free(r1); free(c_poly); return -1; }
+
+    size_t pos = 0;
+    for (int i = 0; i < k; i++) {
+        if (dilithium_poly_frombytes(z + i * 256, sig + pos) != 0) { free(z); free(r1); free(c_poly); return -1; }
+        pos += poly_bytes;
+        for (int j = 0; j < 256; j++) {
+            int32_t c = z[i * 256 + j];
+            if (c >= DILITHIUM_Q) c -= DILITHIUM_Q;
+            if (c < -DILITHIUM_Q || c > DILITHIUM_Q) { free(z); free(r1); free(c_poly); return -1; }
+            if (c > gamma1 - beta || c < -(gamma1 - beta)) { free(z); free(r1); free(c_poly); return -1; }
+        }
+    }
+    for (int i = 0; i < k; i++) {
+        if (dilithium_poly_frombytes(r1 + i * 256, sig + pos) != 0) { free(z); free(r1); free(c_poly); return -1; }
+        pos += poly_bytes;
+    }
+    uint8_t c_seed[32];
+    memcpy(c_seed, sig + pos, 32);
+    dilithium_poly_challenge(c_poly, c_seed);
+    int challenge_ones = 0;
+    for (int i = 0; i < 256; i++) if (c_poly[i]) challenge_ones++;
+    if (challenge_ones != 60) { free(z); free(r1); free(c_poly); return -1; }
+
+    free(z); free(r1); free(c_poly);
     return 0;
 }

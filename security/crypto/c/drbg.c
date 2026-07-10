@@ -16,10 +16,15 @@ int SNEPPX_drbg_init(SNEPPXDRBG* ctx, const uint8_t* entropy, size_t entropy_len
     if (!ctx||!entropy||entropy_len<48) return -1;
     memset(ctx,0,sizeof(*ctx));
 
-    uint8_t seed[SNEPPX_DRBG_SEED_SIZE];
+    uint8_t seed[SNEPPX_DRBG_SEED_SIZE] = {0};
     size_t sl=0;
-    if (entropy) { memcpy(seed,entropy,entropy_len); sl=entropy_len; }
-    if (nonce) { memcpy(seed+sl,nonce,nonce_len); sl+=nonce_len; }
+    size_t copy_len = (entropy_len < SNEPPX_DRBG_SEED_SIZE) ? entropy_len : SNEPPX_DRBG_SEED_SIZE;
+    memcpy(seed,entropy,copy_len); sl=copy_len;
+    if (nonce) {
+        size_t room = SNEPPX_DRBG_SEED_SIZE - sl;
+        size_t nc = (nonce_len < room) ? nonce_len : room;
+        memcpy(seed+sl,nonce,nc); sl+=nc;
+    }
 
     uint8_t hash[32];
     sha256_f(seed,sl,hash);

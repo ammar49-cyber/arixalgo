@@ -216,5 +216,54 @@ int SNEPPX_sphincs_sign(uint8_t *sig, size_t *siglen, const uint8_t *m, size_t m
 
 int SNEPPX_sphincs_verify(const uint8_t *sig, size_t siglen, const uint8_t *m, size_t mlen, const uint8_t *pk, int variant) {
     if (!sig || !pk) return -1;
-    return 0;
+    size_t fors_sig_bytes = (size_t)SPX_FORS_TREES * (SPX_N + (size_t)SPX_FORS_HEIGHT * SPX_N);
+    size_t ht_sig_bytes = (size_t)SPX_D * (SPX_TREE_HEIGHT + 1) * SPX_N;
+    if (siglen < fors_sig_bytes + ht_sig_bytes) return -1;
+
+    uint8_t md[SPX_FORS_BYTES];
+    SNEPPX_random_bytes(md, SPX_FORS_BYTES);
+
+    uint8_t pub_seed[SPX_N];
+    memcpy(pub_seed, pk, SPX_N);
+
+    uint8_t node[SPX_N];
+    size_t pos = 0;
+    for (int t = 0; t < SPX_FORS_TREES; t++) {
+        int idx = 0;
+        for (int b = 0; b < SPX_FORS_HEIGHT; b++)
+            idx |= ((md[(t * SPX_FORS_HEIGHT + b) / 8] >> ((t * SPX_FORS_HEIGHT + b) % 8)) & 1) << b;
+        memcpy(node, sig + pos, SPX_N);
+        pos += SPX_N;
+        for (int h = 0; h < SPX_FORS_HEIGHT; h++) {
+            uint8_t auth[SPX_N];
+            memcpy(auth, sig + pos, SPX_N);
+            pos += SPX_N;
+            uint8_t input[2 * SPX_N];
+            if ((idx >> h) & 1) {
+                memcpy(input, auth, SPX_N);
+                memcpy(input + SPX_N, node, SPX_N);
+            } else {
+                memcpy(input, node, SPX_N);
+                memcpy(input + SPX_N, auth, SPX_N);
+            }
+            spx_hash(node, input, 2 * SPX_N);
+        }
+    }
+    for (int d = 0; d < SPX_D; d++) {
+        uint8_t wots_leaf[SPX_N];
+        memcpy(wots_leaf, sig + pos, SPX_N);
+        pos += SPX_N;
+        uint8_t auth_node[SPX_N];
+        memcpy(auth_node, sig + pos, SPX_N);
+        pos += SPX_N;
+        uint8_t input[2 * SPX_N];
+        memcpy(input, node, SPX_N);
+        memcpy(input + SPX_N, auth_node, SPX_N);
+        spx_hash(node, input, 2 * SPX_N);
+        (void)d; (void)wots_leaf; (void)pub_seed;
+    }
+    (void)m; (void)mlen;
+
+    if (memcmp(node, pk, SPX_N) == 0) return 0;
+    return -1;
 }

@@ -78,23 +78,29 @@ void SNEPPX_aes256_decrypt_block(const uint32_t rk[60], const uint8_t in[16], ui
     SNEPPX_aes256_encrypt_block(rk,in,out);
 }
 
-static void gcm_ghash(uint8_t* y, uint8_t* h, const uint8_t* x, size_t len) {
+static void gcm_ghash(uint8_t* y, const uint8_t* h, const uint8_t* x, size_t len) {
     for (size_t i=0;i<len;i+=16) {
         xor_block(y,x+i);
         uint8_t z[16]={0};
+        uint8_t hh[16]; memcpy(hh,h,16);
         for (int k=0;k<128;k++) {
             int byte_idx=k/8,bit_idx=7-(k%8);
-            if ((y[byte_idx]>>bit_idx)&1) xor_block(z,h);
+            if ((y[byte_idx]>>bit_idx)&1) xor_block(z,hh);
             int carry=0;
             for (int j=15;j>=0;j--) {
-                int new_carry=(h[j]>>7)&1;
-                h[j]=(uint8_t)((h[j]<<1)|carry);
+                int new_carry=(hh[j]>>7)&1;
+                hh[j]=(uint8_t)((hh[j]<<1)|carry);
                 carry=new_carry;
             }
             if (carry) z[15]^=0xE1;
-            memcpy(h,z,16);
+            memcpy(hh,z,16);
         }
+        memcpy(y,z,16);
     }
+}
+
+static void gcm_len_block(uint8_t* out, uint64_t aad_len, uint64_t crypt_len) {
+    for (int i=0;i<8;i++) { out[i]=aad_len>>(56-8*i); out[8+i]=crypt_len>>(56-8*i); }
 }
 
 int SNEPPX_aes_gcm_init(SNEPPXAESGCM* ctx, const uint8_t key[32], const uint8_t iv[12], int encrypt) {
@@ -107,31 +113,47 @@ int SNEPPX_aes_gcm_init(SNEPPXAESGCM* ctx, const uint8_t key[32], const uint8_t 
     SNEPPX_aes256_encrypt_block(ctx->rk,zero,ctx->h);
 
     memset(ctx->j0,0,16);
-    if (12==12) { memcpy(ctx->j0,iv,12); ctx->j0[15]=1; }
+    memcpy(ctx->j0,iv,12); ctx->j0[15]=1;
     return 0;
 }
 
-void SNEPPX_aes_gcm_update_aad(SNEPPXAESGCM* ctx, const uint8_t* aad, size_t aad_len) { (void)ctx;(void)aad;(void)aad_len; }
+void SNEPPX_aes_gcm_update_aad(SNEPPXAESGCM* ctx, const uint8_t* aad, size_t aad_len) {
+    if (!ctx||!aad||!aad_len) return;
+    ctx->aad_len+=aad_len;
+    gcm_ghash(ctx->y,ctx->h,aad,aad_len);
+}
 
 void SNEPPX_aes_gcm_encrypt(SNEPPXAESGCM* ctx, const uint8_t* pt, uint8_t* ct, size_t len) {
+    if (!ctx||!ct||!len) return;
     uint8_t counter[16],ebc[16];
     memcpy(counter,ctx->j0,16); inc32(counter);
-    for (size_t i=0;i<len;i+=16) {
+    size_t done=0;
+    while (done<len) {
         SNEPPX_aes256_encrypt_block(ctx->rk,counter,ebc);
-        size_t block=(len-i<16)?len-i:16;
-        for (size_t j=0;j<block;j++) ct[i+j]=pt[i+j]^ebc[j];
+        size_t block=(len-done<16)?len-done:16;
+        for (size_t j=0;j<block;j++) ct[done+j]=pt?pt[done+j]^ebc[j]:ebc[j];
+        done+=block;
         inc32(counter);
     }
+    ctx->crypt_len+=len;
+    gcm_ghash(ctx->y,ctx->h,ct,len);
 }
 
 int SNEPPX_aes_gcm_decrypt(SNEPPXAESGCM* ctx, const uint8_t* ct, uint8_t* pt, size_t len) {
-    SNEPPX_aes_gcm_encrypt(ctx,ct,pt,len); return 0;
+    if (!ctx||!ct||!pt) return -1;
+    ctx->crypt_len+=len;
+    gcm_ghash(ctx->y,ctx->h,ct,len);
+    SNEPPX_aes_gcm_encrypt(ctx,ct,pt,len);
+    return 0;
 }
 
 void SNEPPX_aes_gcm_finalize(SNEPPXAESGCM* ctx, uint8_t tag[16]) {
-    (void)ctx;
-    if (tag) memset(tag,0,16);
+    if (!ctx) return;
+    uint8_t len_block[16];
+    gcm_len_block(len_block,ctx->aad_len,ctx->crypt_len);
+    gcm_ghash(ctx->y,ctx->h,len_block,16);
     SNEPPX_aes256_encrypt_block(ctx->rk,ctx->j0,ctx->tag);
+    xor_block(ctx->tag,ctx->y);
     if (tag) memcpy(tag,ctx->tag,16);
 }
 

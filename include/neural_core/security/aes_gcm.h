@@ -20,7 +20,10 @@ typedef struct {
     int rounds;
     uint8_t h[SNEPPX_AES_BLOCK_SIZE];
     uint8_t j0[SNEPPX_AES_BLOCK_SIZE];
+    uint8_t y[SNEPPX_AES_BLOCK_SIZE];
     uint8_t tag[SNEPPX_GCM_TAG_SIZE];
+    uint64_t aad_len;
+    uint64_t crypt_len;
     int mode;
 } SNEPPXAESGCM;
 
