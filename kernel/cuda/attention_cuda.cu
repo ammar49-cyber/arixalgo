@@ -781,3 +781,264 @@ SNEPPX_CudaError sneppx_kvcache_alloc_blocks(
 
 SNEPPX_CudaError sneppx_kvcache_free_blocks(
     SNEPPX_KVCache* cache,
+    const int* block_ids,
+    int num_blocks,
+    SNEPPX_CudaStream_t stream
+) {
+    if (!cache || !block_ids) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    cudaMemcpyAsync(
+        &cache->free_blocks[cache->num_free_blocks],
+        block_ids, num_blocks * sizeof(int),
+        cudaMemcpyDeviceToDevice, stream
+    );
+    
+    cache->num_free_blocks += num_blocks;
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+SNEPPX_CudaError sneppx_kvcache_get_block_table(
+    const SNEPPX_KVCache* cache,
+    int layer_idx,
+    int batch_idx,
+    int* block_table,
+    int max_blocks
+) {
+    if (!cache || !block_table) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    cudaMemcpy(
+        block_table,
+        &cache->block_tables[layer_idx * cache->max_blocks_per_seq + batch_idx * cache->max_blocks_per_seq],
+        min(max_blocks, cache->max_blocks_per_seq) * sizeof(int),
+        cudaMemcpyDeviceToHost
+    );
+    
+    return SNEPPX_CUDA_SUCCESS;
+}
+
+// ============================================================================
+// KV Cache Update
+// ============================================================================
+
+__global__ void kvcache_update_kernel(
+    half* key_cache,
+    half* value_cache,
+    const half* __restrict__ new_keys,
+    const half* __restrict__ new_values,
+    const int* __restrict__ slot_mapping,
+    int seq_len,
+    int num_kv_heads,
+    int head_dim,
+    int layer_idx
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int total = seq_len * num_kv_heads * head_dim;
+    
+    if (idx < total) {
+        int flat_idx = idx;
+        int h = (flat_idx / head_dim) % num_kv_heads;
+        int d = flat_idx % head_dim;
+        int s = flat_idx / (num_kv_heads * head_dim);
+        
+        int slot = slot_mapping[s];
+        int cache_idx = (slot * num_kv_heads + h) * head_dim + d;
+        
+        key_cache[cache_idx] = new_keys[idx];
+        value_cache[cache_idx] = new_values[idx];
+    }
+}
+
+SNEPPX_CudaError sneppx_kvcache_update(
+    SNEPPX_CudaStream_t stream,
+    SNEPPX_KVCache* cache,
+    const SNEPPX_KVCacheUpdateParams* params
+) {
+    if (!cache || !params) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    int total = params->seq_len * params->num_kv_heads * params->head_dim;
+    int block = 256;
+    int grid_val = (total + block - 1) / block;
+    
+    kvcache_update_kernel<<<grid_val, block, 0, stream>>>(
+        &cache->key_cache[params->layer_idx * cache->num_blocks * cache->block_size * cache->num_kv_heads * cache->head_dim],
+        &cache->value_cache[params->layer_idx * cache->num_blocks * cache->block_size * cache->num_kv_heads * cache->head_dim],
+        params->new_keys, params->new_values,
+        params->slot_mapping,
+        params->seq_len, params->num_kv_heads, params->head_dim,
+        params->layer_idx
+    );
+    
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// ============================================================================
+// RoPE Forward
+// ============================================================================
+
+__global__ void rope_fwd_kernel(
+    const half* __restrict__ input,
+    half* __restrict__ output,
+    const half* __restrict__ cos_cache,
+    const half* __restrict__ sin_cache,
+    const int* __restrict__ positions,
+    int seq_len,
+    int num_heads,
+    int head_dim,
+    bool interleaved
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int total = gridDim.x * blockDim.x;
+    
+    int half_dim = head_dim / 2;
+    
+    while (idx < total) {
+        int d2 = idx % (half_dim);
+        int h = (idx / half_dim) % num_heads;
+        int s = idx / (num_heads * half_dim);
+        int batch = s / seq_len;
+        s = s % seq_len;
+        
+        int pos = positions ? positions[batch * seq_len + s] : s;
+        
+        int d1 = d2 * 2;
+        int d_next = d1 + 1;
+        
+        float x0 = __half2float(input[idx * 2]);
+        float x1 = __half2float(input[idx * 2 + 1]);
+        
+        float cos_val = __half2float(cos_cache[pos * half_dim + d2]);
+        float sin_val = __half2float(sin_cache[pos * half_dim + d2]);
+        
+        float y0, y1;
+        if (interleaved) {
+            y0 = x0 * cos_val - x1 * sin_val;
+            y1 = x0 * sin_val + x1 * cos_val;
+        } else {
+            y0 = x0 * cos_val - x1 * sin_val;
+            y1 = x0 * sin_val + x1 * cos_val;
+        }
+        
+        output[idx * 2] = __float2half_rn(y0);
+        output[idx * 2 + 1] = __float2half_rn(y1);
+        
+        idx += blockDim.x * gridDim.x;
+    }
+}
+
+SNEPPX_CudaError sneppx_cuda_rope_forward(
+    SNEPPX_CudaStream_t stream,
+    const half* input,
+    half* output,
+    const half* cos_cache,
+    const half* sin_cache,
+    const int* positions,
+    int batch_size,
+    int seq_len,
+    int num_heads,
+    int head_dim,
+    bool interleaved
+) {
+    if (!input || !output || !cos_cache || !sin_cache) {
+        return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    }
+    
+    int total_pairs = batch_size * seq_len * num_heads * (head_dim / 2);
+    int block = 256;
+    int grid_val = min((total_pairs + block - 1) / block, 65535);
+    
+    rope_fwd_kernel<<<grid_val, block, 0, stream>>>(
+        input, output, cos_cache, sin_cache, positions,
+        seq_len, num_heads, head_dim, interleaved
+    );
+    
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+SNEPPX_CudaError sneppx_cuda_rope_inplace(
+    SNEPPX_CudaStream_t stream,
+    half* tensor,
+    const half* cos_cache,
+    const half* sin_cache,
+    const int* positions,
+    int batch_size,
+    int seq_len,
+    int num_heads,
+    int head_dim,
+    bool interleaved
+) {
+    return sneppx_cuda_rope_forward(
+        stream, tensor, tensor, cos_cache, sin_cache, positions,
+        batch_size, seq_len, num_heads, head_dim, interleaved
+    );
+}
+
+// ============================================================================
+// RoPE Cache Precompute
+// ============================================================================
+
+SNEPPX_CudaError sneppx_cuda_rope_precompute_cache(
+    half* cos_cache,
+    half* sin_cache,
+    int max_seq_len,
+    int head_dim,
+    float base,
+    float scale,
+    SNEPPX_CudaStream_t stream
+) {
+    if (!cos_cache || !sin_cache) return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    
+    int half_dim = head_dim / 2;
+    
+    // Precompute on host, copy to device
+    float* h_cos = (float*)malloc(max_seq_len * half_dim * sizeof(float));
+    float* h_sin = (float*)malloc(max_seq_len * half_dim * sizeof(float));
+    
+    if (!h_cos || !h_sin) {
+        free(h_cos);
+        free(h_sin);
+        return SNEPPX_CUDA_ERROR_OUT_OF_MEMORY;
+    }
+    
+    for (int pos = 0; pos < max_seq_len; pos++) {
+        float scaled_pos = (float)pos * scale;
+        for (int d = 0; d < half_dim; d++) {
+            float theta = scaled_pos / powf(base, 2.0f * d / head_dim);
+            h_cos[pos * half_dim + d] = cosf(theta);
+            h_sin[pos * half_dim + d] = sinf(theta);
+        }
+    }
+    
+    // Convert to half and copy
+    half* h_cos_half = (half*)malloc(max_seq_len * half_dim * sizeof(half));
+    half* h_sin_half = (half*)malloc(max_seq_len * half_dim * sizeof(half));
+    
+    for (int i = 0; i < max_seq_len * half_dim; i++) {
+        h_cos_half[i] = __float2half_rn(h_cos[i]);
+        h_sin_half[i] = __float2half_rn(h_sin[i]);
+    }
+    
+    cudaMemcpyAsync(cos_cache, h_cos_half, max_seq_len * half_dim * sizeof(half), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(sin_cache, h_sin_half, max_seq_len * half_dim * sizeof(half), cudaMemcpyHostToDevice, stream);
+    
+    free(h_cos);
+    free(h_sin);
+    free(h_cos_half);
+    free(h_sin_half);
+    
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// ============================================================================
+// Causal Mask
+// ============================================================================
+
+__global__ void causal_mask_kernel(
+    half* mask,
+    int seq_len_q,
+    int seq_len_kv,
+    int batch_size,
+    int num_heads,
+    float mask_value
