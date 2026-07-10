@@ -259,3 +259,264 @@ __global__ void flashattn_v2_fwd_kernel(
                                   __half2float(k_shared[kv_off * kHeadDim + kk]);
                     }
                     s_val = sneppx_warp_reduce_sum(s_val);
+                    
+                    s_val *= scale;
+                    
+                    if (bias != nullptr) {
+                        s_val += __half2float(bias_shared[q_off * kBlockN + kv_off]);
+                    }
+                    
+                    // softmax weight
+                    float p = expf(s_val - m_new);
+                    
+                    // Accumulate to output
+                    for (int d_off = lane_id; d_off < kHeadDim; d_off += SNEPPX_WARP_SIZE) {
+                        float v_val = __half2float(v_shared[kv_off * kHeadDim + d_off]);
+                        acc[q_off * (kHeadDim / kWarpCount) + (d_off / SNEPPX_WARP_SIZE)] += p * v_val;
+                    }
+                }
+            }
+        }
+        
+        // Update persistent softmax stats
+        for (int i = 0; i < q_blocks; i++) {
+            row_max[i] = m_bcast[i];
+            row_sum[i] = s_bcast[i];
+        }
+        
+        __syncthreads();
+    }
+    
+    // Write output with final normalization
+    for (int q_off = warp_id; q_off < q_blocks; q_off += num_warps) {
+        int actual_q_row = q_start + q_off;
+        if (actual_q_row >= seq_len_q) continue;
+        
+        float inv_sum = __fdividef(1.0f, row_sum[q_off]);
+        
+        int output_offset = ((batch_idx * num_heads + head_idx) * seq_len_q + actual_q_row) * kHeadDim;
+        
+        for (int d_off = lane_id; d_off < kHeadDim; d_off += SNEPPX_WARP_SIZE) {
+            float val = acc[q_off * (kHeadDim / kWarpCount) + (d_off / SNEPPX_WARP_SIZE)] * inv_sum;
+            output[output_offset + d_off] = __float2half_rn(val);
+        }
+        
+        // Write log-sum-exp if requested
+        if (lse != nullptr) {
+            if (lane_id == 0) {
+                int lse_idx = (batch_idx * num_heads + head_idx) * seq_len_q + actual_q_row;
+                lse[lse_idx] = row_max[q_off] + __logf(row_sum[q_off]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Flash Attention v2 Forward API
+// ============================================================================
+
+SNEPPX_CudaError sneppx_cuda_flash_attn_v2_forward(
+    SNEPPX_CudaStream_t stream,
+    const SNEPPX_FlashAttnParams* params
+) {
+    if (!params || !params->q || !params->k || !params->v || !params->output) {
+        return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    }
+    
+    int num_blocks_q = (params->seq_len_q + params->block_m - 1) / params->block_m;
+    
+    dim3 grid(num_heads * num_blocks_q, params->batch_size);
+    dim3 block(32, 4);
+    
+    const int kHeadDim = params->head_dim;
+    const float kScale = params->scale;
+    
+    // Flash Attention v2 supports head_dim up to 256
+    if (kHeadDim <= 64) {
+        auto kernel = flashattn_v2_fwd_kernel<64, 64, 64, 4>;
+        kernel<<<grid, block, 0, stream>>>(
+            params->q, params->k, params->v, params->output, params->lse,
+            params->bias, params->mask,
+            params->seq_len_q, params->seq_len_kv, params->num_heads,
+            kScale, params->dropout_p, params->is_causal,
+            params->window_left, params->window_right
+        );
+    } else if (kHeadDim <= 128) {
+        auto kernel = flashattn_v2_fwd_kernel<64, 64, 128, 4>;
+        kernel<<<grid, block, 0, stream>>>(
+            params->q, params->k, params->v, params->output, params->lse,
+            params->bias, params->mask,
+            params->seq_len_q, params->seq_len_kv, params->num_heads,
+            kScale, params->dropout_p, params->is_causal,
+            params->window_left, params->window_right
+        );
+    } else {
+        auto kernel = flashattn_v2_fwd_kernel<32, 64, 256, 4>;
+        kernel<<<grid, block, 0, stream>>>(
+            params->q, params->k, params->v, params->output, params->lse,
+            params->bias, params->mask,
+            params->seq_len_q, params->seq_len_kv, params->num_heads,
+            kScale, params->dropout_p, params->is_causal,
+            params->window_left, params->window_right
+        );
+    }
+    
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// ============================================================================
+// Flash Attention v2 Backward Kernel (Simplified)
+// ============================================================================
+
+__global__ void flashattn_v2_bwd_dq_kernel(
+    const half* __restrict__ q,
+    const half* __restrict__ k,
+    const half* __restrict__ v,
+    const half* __restrict__ output,
+    const half* __restrict__ d_output,
+    const float* __restrict__ lse,
+    half* __restrict__ d_q,
+    int seq_len_q,
+    int seq_len_kv,
+    int num_heads,
+    int head_dim,
+    float scale
+) {
+    int bid = blockIdx.x;
+    int tid = threadIdx.x;
+    
+    int batch_idx = blockIdx.y;
+    int head_idx = bid / seq_len_q;
+    int q_idx = bid % seq_len_q;
+    
+    extern __shared__ __align__(16) half smem[];
+    half* k_smem = smem;
+    half* v_smem = &smem[seq_len_kv * head_dim];
+    half* dout_smem = &smem[seq_len_kv * head_dim * 2];
+    half* out_smem = &smem[seq_len_kv * head_dim * 3];
+    
+    int base = ((batch_idx * num_heads + head_idx) * seq_len_kv) * head_dim;
+    int q_base = ((batch_idx * num_heads + head_idx) * seq_len_q + q_idx) * head_dim;
+    
+    // Load K, V, dO, O for this sequence into shared
+    for (int i = tid; i < seq_len_kv * head_dim; i += blockDim.x) {
+        k_smem[i] = k[base + i];
+        v_smem[i] = v[base + i];
+        dout_smem[i] = d_output[q_base + i];
+        out_smem[i] = output[q_base + i];
+    }
+    __syncthreads();
+    
+    half q_vec = q[q_base + tid];
+    
+    float dq_local = 0.0f;
+    float lse_val = lse[(batch_idx * num_heads + head_idx) * seq_len_q + q_idx];
+    
+    for (int kv = 0; kv < seq_len_kv; kv++) {
+        half k_vec = k_smem[kv * head_dim + tid];
+        half dout_vec = dout_smem[kv * head_dim + tid];
+        half out_vec = out_smem[kv * head_dim + tid];
+        
+        float s = 0.0f;
+        for (int d = 0; d < head_dim; d += 32) {
+            int d_idx = d + (tid % 32);
+            if (d_idx < head_dim) {
+                s += __half2float(q[q_base + d_idx]) * __half2float(k_smem[kv * head_dim + d_idx]);
+            }
+        }
+        // warp reduce s
+        for (int offset = 16; offset > 0; offset >>= 1) {
+            s += __shfl_down_sync(0xFFFFFFFF, s, offset);
+        }
+        s = __shfl_sync(0xFFFFFFFF, s, 0);
+        
+        s *= scale;
+        float p = expf(s - lse_val);
+        
+        // dS = P * (dO - rowsum(P * dO)) * scale
+        float dv = __half2float(dout_vec);
+        float ov = __half2float(out_vec);
+        float ds = p * (dv - ov) * scale;
+        
+        dq_local += ds * __half2float(k_vec);
+    }
+    
+    d_q[q_base + tid] = __float2half_rn(dq_local);
+}
+
+// ============================================================================
+// Flash Attention v2 Backward API
+// ============================================================================
+
+SNEPPX_CudaError sneppx_cuda_flash_attn_v2_backward(
+    SNEPPX_CudaStream_t stream,
+    const SNEPPX_FlashAttnBwdParams* params
+) {
+    if (!params || !params->q || !params->k || !params->v || 
+        !params->d_output || !params->d_q || !params->d_k || !params->d_v) {
+        return SNEPPX_CUDA_ERROR_INVALID_ARG;
+    }
+    
+    dim3 grid(params->seq_len_q * params->num_heads, params->batch_size);
+    dim3 block(min(params->head_dim, 256));
+    
+    size_t smem_size = params->seq_len_kv * params->head_dim * 4 * sizeof(half);
+    
+    flashattn_v2_bwd_dq_kernel<<<grid, block, smem_size, stream>>>(
+        params->q, params->k, params->v,
+        params->output, params->d_output, params->lse,
+        params->d_q,
+        params->seq_len_q, params->seq_len_kv, params->num_heads,
+        params->head_dim, params->scale
+    );
+    
+    cudaError_t err = cudaGetLastError();
+    return (err == cudaSuccess) ? SNEPPX_CUDA_SUCCESS : SNEPPX_CUDA_ERROR_LAUNCH_FAILED;
+}
+
+// ============================================================================
+// GQA Forward
+// ============================================================================
+
+__global__ void gqa_fwd_kernel(
+    const half* __restrict__ q,
+    const half* __restrict__ k,
+    const half* __restrict__ v,
+    half* __restrict__ output,
+    int seq_len_q,
+    int seq_len_kv,
+    int num_q_heads,
+    int num_kv_heads,
+    int head_dim,
+    float scale,
+    bool is_causal
+) {
+    int bid_x = blockIdx.x;
+    int bid_y = blockIdx.y;
+    int tid = threadIdx.x;
+    
+    int batch_idx = bid_y;
+    int num_blocks_q = (seq_len_q + 32 - 1) / 32;
+    int head_group = bid_x / num_blocks_q;
+    int block_q = bid_x % num_blocks_q;
+    
+    int q_head = head_group;
+    int kv_head = head_group * num_kv_heads / num_q_heads;
+    
+    int q_start = block_q * 32;
+    int q_end = min(q_start + 32, seq_len_q);
+    
+    __shared__ half q_smem[32 * 128];
+    __shared__ half k_smem[32 * 128];
+    
+    int q_base = ((batch_idx * num_q_heads + q_head) * seq_len_q) * head_dim;
+    int kv_base = ((batch_idx * num_kv_heads + kv_head) * seq_len_kv) * head_dim;
+    
+    for (int r = tid / head_dim; r < min(32, q_end - q_start); r += 1) {
+        int c = tid % head_dim;
+        int src = q_base + (q_start + r) * head_dim + c;
+        q_smem[r * head_dim + c] = q[src];
+    }
+    __syncthreads();
+    
