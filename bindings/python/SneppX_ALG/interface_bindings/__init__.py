@@ -256,6 +256,10 @@ from .distillation import (
     OnlineDistillation, DistillationPruner,
     distill_bert, distill_gpt,
 )
+from .benchmark import (
+    BenchmarkConfig, BenchmarkResult, BenchmarkSuite,
+    run_benchmark_cli,
+)
 from .train import (
     Trainer,
     TrainConfig,
@@ -354,13 +358,17 @@ __all__ = [
     'compute_sparsity', 'count_parameters', 'print_pruning_summary',
     'apply_pruning_mask', 'recover_pruned_weights',
     'distillation_loss', 'prune_and_distill',
+    'distillation_loss', 'prune_and_distill',
     'find_winning_ticket', 'rewrite_weights',
     # distillation
     'kd_loss', 'attention_transfer_loss', 'feature_matching_loss',
     'correlation_congruence_loss', 'hint_loss', 'crd_loss',
     'multi_teacher_distillation_loss', 'ensemble_teacher_distillation',
     'OnlineDistillation', 'DistillationPruner',
-    'distillation_loss', 'distill_bert', 'distill_gpt',
+    'distill_bert', 'distill_gpt',
+    # benchmark
+    'BenchmarkConfig', 'BenchmarkResult', 'BenchmarkSuite',
+    'run_benchmark_cli',
     # train (C++ backend)
     'Trainer', 'TrainConfig',
     'CppOptimizer', 'CppSGD', 'CppAdam', 'CppAdamW',
