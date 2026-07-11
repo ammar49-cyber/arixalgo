@@ -64,7 +64,7 @@ jobs:
   # =====================================================================
   docker-cuda:
     name: Docker (CUDA)
-    if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+    if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
