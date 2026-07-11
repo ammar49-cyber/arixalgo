@@ -1,57 +1,19 @@
 #include "../../include/neural_core/architecture/advanced_arch.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
-#ifdef SNEPPX_HAS_CUDA
 #include <cublas_v2.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-struct SNEPPX_DifferentialAttn {
-    float* q_proj; float* k_proj; float* v_proj; float* o_proj;
-    float lambda_q, lambda_k;
-    int heads, dim, head_dim;
-};
-
-struct SNEPPX_LatentAttn {
-    float *w_kv, *w_q, *w_o, *w_kv_proj;
-    int heads, kv_heads, dim, head_dim;
-    int use_rope;
-};
-
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int sneppx_diff_attn_init(SNEPPX_DifferentialAttn** da, int heads, int dim)  {
-    return -1;
-}
-
-int sneppx_diff_attn_forward(SNEPPX_DifferentialAttn* da, const float* x,                               float* output, int batch, int seq_len)  {
-    return -1;
-}
-
-int sneppx_diff_attn_destroy(SNEPPX_DifferentialAttn* da)  {
-    return -1;
-}
-
-int sneppx_latent_attn_init(SNEPPX_LatentAttn** la, int heads, int kv_heads, int dim)  {
-    return -1;
-}
-
-int sneppx_latent_attn_forward(SNEPPX_LatentAttn* la, const float* x,                                 float* output, int batch, int seq_len)  {
-    return -1;
-}
-
-int sneppx_latent_attn_destroy(SNEPPX_LatentAttn* la)  {
-    return -1;
-}
-
-#else
 
 // ============================================================================
 // Differential Attention: attn = (QK^T - lambda * rotated_Q * rotated_K^T) / sqrt(d)
 // ============================================================================
 
+struct SNEPPX_DifferentialAttn {
+    float* q_proj; float* k_proj; float* v_proj; float* o_proj;
+    float lambda_q, lambda_k;
+    int heads, dim, head_dim;
+};
 
 int sneppx_diff_attn_init(SNEPPX_DifferentialAttn** da, int heads, int dim) {
     if (!da) return -1;
@@ -117,6 +79,11 @@ int sneppx_diff_attn_destroy(SNEPPX_DifferentialAttn* da) {
 // Latent Attention (DeepSeek MLA)
 // ============================================================================
 
+struct SNEPPX_LatentAttn {
+    float *w_kv, *w_q, *w_o, *w_kv_proj;
+    int heads, kv_heads, dim, head_dim;
+    int use_rope;
+};
 
 int sneppx_latent_attn_init(SNEPPX_LatentAttn** la, int heads, int kv_heads, int dim) {
     if (!la) return -1;
@@ -171,4 +138,3 @@ int sneppx_latent_attn_destroy(SNEPPX_LatentAttn* la) {
     free(la);
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

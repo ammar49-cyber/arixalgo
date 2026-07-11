@@ -1,11 +1,14 @@
 #include "../../include/neural_core/architecture/distributed.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+
+// ============================================================================
+// Hierarchical All-Reduce (NVLink intra-node + RDMA inter-node)
+// ============================================================================
+
 typedef struct {
     int local_rank;
     int local_size;
@@ -26,52 +29,6 @@ typedef struct {
     float* inter_buffer;
     size_t buffer_size;
 } SNEPPX_HierarchicalAR;
-
-typedef struct {
-    float* error_feedback;
-    float* compressed_grads;
-    int* compressed_indices;
-    float compression_ratio;
-    int numel;
-    int k;
-} SNEPPX_GradCompressor;
-
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int sneppx_hierarchical_ar_init(SNEPPX_HierarchicalAR** har,                                  int local_rank, int local_size,                                  int global_rank, int global_size,                                  int node_id, int num_nodes)  {
-    return -1;
-}
-
-void sneppx_hierarchical_ar_destroy(SNEPPX_HierarchicalAR* har)  {
-    return -1;
-}
-
-int sneppx_hierarchical_ar_all_reduce(SNEPPX_HierarchicalAR* har,                                        float* data, size_t numel,                                        cudaStream_t stream)  {
-    return -1;
-}
-
-int sneppx_grad_compressor_init(SNEPPX_GradCompressor** gc,                                  int numel, float compression_ratio)  {
-    return -1;
-}
-
-void sneppx_grad_compressor_destroy(SNEPPX_GradCompressor* gc)  {
-    return -1;
-}
-
-int sneppx_grad_compress(SNEPPX_GradCompressor* gc,                           const float* grads, cudaStream_t stream)  {
-    return -1;
-}
-
-int sneppx_grad_decompress(SNEPPX_GradCompressor* gc,                             float* output, cudaStream_t stream)  {
-    return -1;
-}
-
-#else
-
-// ============================================================================
-// Hierarchical All-Reduce (NVLink intra-node + RDMA inter-node)
-// ============================================================================
-
 
 int sneppx_hierarchical_ar_init(SNEPPX_HierarchicalAR** har,
                                  int local_rank, int local_size,
@@ -148,6 +105,14 @@ int sneppx_hierarchical_ar_all_reduce(SNEPPX_HierarchicalAR* har,
 // Gradient Compression (top-k sparsification + error feedback)
 // ============================================================================
 
+typedef struct {
+    float* error_feedback;
+    float* compressed_grads;
+    int* compressed_indices;
+    float compression_ratio;
+    int numel;
+    int k;
+} SNEPPX_GradCompressor;
 
 int sneppx_grad_compressor_init(SNEPPX_GradCompressor** gc,
                                  int numel, float compression_ratio) {
@@ -243,4 +208,3 @@ int sneppx_grad_decompress(SNEPPX_GradCompressor* gc,
                                                           gc->compressed_indices, gc->k);
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

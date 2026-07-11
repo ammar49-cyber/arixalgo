@@ -3,9 +3,7 @@
 #include "../../include/neural_core/kernel/checkpoint.h"
 #include "../../include/neural_core/architecture/distributed.h"
 #include "../../fs/format/checkpoint_reader.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -24,6 +22,15 @@ static DWORD WINAPI snepx_thread_wrapper(LPVOID arg) {
 }
 #else
 #include <pthread.h>
+typedef pthread_t snepx_thread_t;
+#endif
+
+/* =========================================================================
+ * Double-buffered async checkpoint internals
+ * ========================================================================= */
+
+#define SNEPPX_CKPT_NUM_BUFFERS 2
+
 typedef struct {
     char* host_buffer;
     size_t host_capacity;
@@ -55,88 +62,8 @@ struct SNEPPXCkptAsync {
     int header_allocated;
 };
 
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)arg;
-
-        struct timespec ts = {0, 1000000};
-
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)calloc(1, sizeof(struct SNEPPXCkptAsync));
-
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
-
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
-
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
-
-    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
-
-struct SNEPPX_FaultTolerance {
-    SNEPPXHeartbeat* heartbeat;
-    SNEPPXElasticTraining* elastic;
-    int world_size;
-    int rank;
-    int heartbeat_interval_ms;
-    int timeout_ms;
-    int max_restarts;
-    int restart_count;
-    int enable_elastic;
-    int num_alive;
-    int* alive_ranks;
-    int64_t last_check_ns;
-};
-
-    struct SNEPPX_FaultTolerance* f = (struct SNEPPX_FaultTolerance*)calloc(1, sizeof(struct SNEPPX_FaultTolerance));
-
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int SNEPPX_checkpoint_init(SNEPPX_CheckpointCoord** cp,                             const char* dir, int world_size, int rank,                             int save_interval, int keep_last,                             int async_enabled)  {
-    return -1;
-}
-
-void sneppx_checkpoint_destroy(SNEPPX_CheckpointCoord* cp)  {
-    return -1;
-}
-
-int sneppx_checkpoint_save(SNEPPX_CheckpointCoord* cp,                             const void* model_state, size_t state_size,                             int current_step, cudaStream_t stream)  {
-    return -1;
-}
-
-int sneppx_checkpoint_load(SNEPPX_CheckpointCoord* cp,                             void* model_state, size_t state_size,                             int* loaded_step)  {
-    return -1;
-}
-
-int sneppx_checkpoint_coordinated_save(SNEPPX_CheckpointCoord* cp,                                          const void* model_state, size_t state_size,                                          int current_step, cudaStream_t stream,                                          int (*barrier_fn)(void))  {
-    return -1;
-}
-
-int sneppx_fault_tolerance_init(SNEPPX_FaultTolerance** ft,                                   int world_size, int rank,                                   int heartbeat_ms, int timeout_ms)  {
-    return -1;
-}
-
-void sneppx_fault_tolerance_destroy(SNEPPX_FaultTolerance* ft)  {
-    return -1;
-}
-
-int sneppx_fault_tolerance_check_health(SNEPPX_FaultTolerance* ft)  {
-    return -1;
-}
-
-int sneppx_fault_tolerance_handle_failure(SNEPPX_FaultTolerance* ft,                                             int failed_rank)  {
-    return -1;
-}
-
-#else
-typedef pthread_t snepx_thread_t;
-#endif
-
-/* =========================================================================
- * Double-buffered async checkpoint internals
- * ========================================================================= */
-
-#define SNEPPX_CKPT_NUM_BUFFERS 2
-
-
-
 static void snepx_ckpt_io_thread_fn(void* arg) {
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)arg;
     while (ckpt->io_running) {
         if (ckpt->io_pending) {
             cudaStreamSynchronize(ckpt->save_stream);
@@ -146,6 +73,7 @@ static void snepx_ckpt_io_thread_fn(void* arg) {
 #ifdef _WIN32
         Sleep(1);
 #else
+        struct timespec ts = {0, 1000000};
         nanosleep(&ts, NULL);
 #endif
     }
@@ -197,6 +125,7 @@ int SNEPPX_checkpoint_init(SNEPPX_CheckpointCoord** cp,
                             int save_interval, int keep_last,
                             int async_enabled) {
     if (!cp || !dir) return -1;
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)calloc(1, sizeof(struct SNEPPXCkptAsync));
     if (!ckpt) return -1;
     strncpy(ckpt->checkpoint_dir, dir, 511);
     ckpt->world_size = world_size;
@@ -248,6 +177,7 @@ int SNEPPX_checkpoint_init(SNEPPX_CheckpointCoord** cp,
 
 void sneppx_checkpoint_destroy(SNEPPX_CheckpointCoord* cp) {
     if (!cp) return;
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
     if (ckpt) {
         ckpt->io_running = 0;
         if (ckpt->io_thread) {
@@ -275,6 +205,7 @@ void sneppx_checkpoint_destroy(SNEPPX_CheckpointCoord* cp) {
 
 static void sneppx_build_checkpoint_path(SNEPPX_CheckpointCoord* cp,
                                           int step, char* path, size_t path_size) {
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
     snprintf(path, path_size, "%s/checkpoint_%d_rank_%d.sneppx",
              ckpt->checkpoint_dir, step, cp->rank);
 }
@@ -283,6 +214,7 @@ int sneppx_checkpoint_save(SNEPPX_CheckpointCoord* cp,
                             const void* model_state, size_t state_size,
                             int current_step, cudaStream_t stream) {
     if (!cp || !model_state) return -1;
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
     if (!ckpt) return -1;
 
     ckpt->current_step = current_step;
@@ -340,6 +272,7 @@ int sneppx_checkpoint_load(SNEPPX_CheckpointCoord* cp,
                             void* model_state, size_t state_size,
                             int* loaded_step) {
     if (!cp || !model_state) return -1;
+    struct SNEPPXCkptAsync* ckpt = (struct SNEPPXCkptAsync*)cp->_async_state;
     if (!ckpt) return -1;
 
     if (ckpt->io_pending) {
@@ -414,11 +347,26 @@ int sneppx_checkpoint_coordinated_save(SNEPPX_CheckpointCoord* cp,
  * Fault Tolerance Manager
  * ========================================================================= */
 
+struct SNEPPX_FaultTolerance {
+    SNEPPXHeartbeat* heartbeat;
+    SNEPPXElasticTraining* elastic;
+    int world_size;
+    int rank;
+    int heartbeat_interval_ms;
+    int timeout_ms;
+    int max_restarts;
+    int restart_count;
+    int enable_elastic;
+    int num_alive;
+    int* alive_ranks;
+    int64_t last_check_ns;
+};
 
 int sneppx_fault_tolerance_init(SNEPPX_FaultTolerance** ft,
                                   int world_size, int rank,
                                   int heartbeat_ms, int timeout_ms) {
     if (!ft) return -1;
+    struct SNEPPX_FaultTolerance* f = (struct SNEPPX_FaultTolerance*)calloc(1, sizeof(struct SNEPPX_FaultTolerance));
     if (!f) return -1;
     f->world_size = world_size;
     f->rank = rank;
@@ -475,4 +423,3 @@ int sneppx_fault_tolerance_handle_failure(SNEPPX_FaultTolerance* ft,
            new_world_size, new_rank, ft->restart_count, ft->max_restarts);
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

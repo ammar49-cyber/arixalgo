@@ -1,11 +1,14 @@
 #include "../../include/neural_core/architecture/distributed.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+
+// ============================================================================
+// ZeRO Stage 1: Optimizer State Partitioning
+// ============================================================================
+
 typedef struct {
     int param_idx;
     int owning_rank;
@@ -26,28 +29,6 @@ struct SNEPPX_ZeroOptimizer {
     float* exp_avg_sq;
     size_t local_numel;
 };
-
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int sneppx_zero_init(SNEPPX_ZeroOptimizer** opt, int num_params,                      int world_size, int rank, int stage,                      const SNEPPX_DistributedConfig* config)  {
-    return -1;
-}
-
-int sneppx_zero_step(SNEPPX_ZeroOptimizer* opt, float* grads,                      cudaStream_t stream)  {
-    return -1;
-}
-
-int sneppx_zero_destroy(SNEPPX_ZeroOptimizer* opt)  {
-    return -1;
-}
-
-#else
-
-// ============================================================================
-// ZeRO Stage 1: Optimizer State Partitioning
-// ============================================================================
-
-
 
 static size_t sneppx_zero_partition_size(int total, int world_size, int rank) {
     size_t base = total / world_size;
@@ -177,4 +158,3 @@ int sneppx_zero_destroy(SNEPPX_ZeroOptimizer* opt) {
     free(opt);
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

@@ -1,13 +1,14 @@
 #include "../../include/neural_core/architecture/distributed.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_fp16.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+// ============================================================================
+// Distributed Data Parallel (DDP)
+// ============================================================================
+
 typedef struct {
     float* grad_buffer;
     void* nccl_comm;
@@ -19,31 +20,6 @@ typedef struct {
     cudaStream_t comm_stream;
     cudaEvent_t* sync_events;
 } SNEPPX_DDPState;
-
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int sneppx_ddp_init(SNEPPX_DDPState** ddp, int world_size, int rank,                     int bucket_size_mb, int overlap_comm)  {
-    return -1;
-}
-
-void sneppx_ddp_destroy(SNEPPX_DDPState* ddp)  {
-    return -1;
-}
-
-int sneppx_ddp_all_reduce_grads(SNEPPX_DDPState* ddp, float** grads,                                  size_t* sizes, int num_grads,                                  cudaStream_t compute_stream)  {
-    return -1;
-}
-
-int sneppx_ddp_bucket_all_reduce(SNEPPX_DDPState* ddp, int bucket_id,                                   float* data, size_t size,                                   cudaStream_t compute_stream)  {
-    return -1;
-}
-
-#else
-
-// ============================================================================
-// Distributed Data Parallel (DDP)
-// ============================================================================
-
 
 int sneppx_ddp_init(SNEPPX_DDPState** ddp, int world_size, int rank,
                     int bucket_size_mb, int overlap_comm) {
@@ -116,4 +92,3 @@ int sneppx_ddp_bucket_all_reduce(SNEPPX_DDPState* ddp, int bucket_id,
     }
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

@@ -1,44 +1,9 @@
 #include "../../include/neural_core/architecture/advanced_arch.h"
-#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
-#endif
-#ifdef SNEPPX_HAS_CUDA
 #include <cublas_v2.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#ifndef SNEPPX_HAS_CUDA
-// CPU fallback stubs (CUDA not available)
-int sneppx_flex_attn_forward(const float* q, const float* k, const float* v,                               float* output, const SNEPPX_FlexAttnMask* mask,                               int batch, int heads, int dim, float scale)  {
-    return -1;
-}
-
-int sneppx_multimodal_cross_attn(const float* text_q, const float* vision_k,                                   const float* vision_v, float* output,                                   int text_len, int vision_len, int heads, int dim)  {
-    return -1;
-}
-
-int sneppx_mixture_of_depth(const float* x, float* output,                              const float* router_weights,                              int* selected_indices,                              int batch, int seq, int dim,                              int num_experts, int top_k)  {
-    return -1;
-}
-
-int sneppx_gated_activation_forward(const float* x, const float* gate,                                      float* output, SNEPPX_GatedActType act,                                      int numel)  {
-    return -1;
-}
-
-int sneppx_yarn_rope_forward(const float* x, float* output,                               const float* cos_cache, const float* sin_cache,                               int batch, int seq, int heads, int dim,                               float scale, float alpha, float beta)  {
-    return -1;
-}
-
-int sneppx_yarn_precompute_cache(float* cos, float* sin,                                   int max_seq, int dim, float base,                                   float scale, float alpha, float beta)  {
-    return -1;
-}
-
-int sneppx_alibi_forward(float* attn_scores, int batch, int heads,                           int seq_q, int seq_k, float slope_base)  {
-    return -1;
-}
-
-#else
 
 // ============================================================================
 // FlexAttention: Block-sparse attention with mask modulation
@@ -278,4 +243,3 @@ int sneppx_alibi_forward(float* attn_scores, int batch, int heads,
     }
     return 0;
 }
-#endif /* SNEPPX_HAS_CUDA */

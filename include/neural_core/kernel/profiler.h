@@ -4,13 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef SNEPPX_HAS_CUDA
-#include <cuda_runtime.h>
-#else
-typedef void* cudaStream_t;
-typedef void* cudaEvent_t;
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,7 +61,6 @@ float SNEPPX_kernel_timer_stop(SNEPPX_KernelTimer* kt, cudaStream_t stream);
 void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt);
 
 /* Convenience macro: profiles a kernel launch */
-#ifdef SNEPPX_HAS_CUDA
 #define SNEPPX_PROFILE_KERNEL(prof, name, stream, kernel_call) \
     do { \
         cudaEvent_t _p_start, _p_end; \
@@ -84,10 +76,6 @@ void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt);
         cudaEventDestroy(_p_start); \
         cudaEventDestroy(_p_end); \
     } while(0)
-#else
-#define SNEPPX_PROFILE_KERNEL(prof, name, stream, kernel_call) \
-    do { kernel_call; } while(0)
-#endif
 
 /* Stack-based NVTX-style range markers (no NVTX dependency) */
 void SNEPPX_range_push(const char* name);
