@@ -1,14 +1,6 @@
-# FM algorithm CUDA extensions
+# FM algorithm CUDA extensions — compiled directly into the architecture layer.
 
 file(GLOB SNEPPX_FM_CUDA_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*.cu)
-
-add_library(neural_fm_cuda STATIC ${SNEPPX_FM_CUDA_SRC})
-
-target_include_directories(neural_fm_cuda PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-
-target_link_libraries(neural_fm_cuda PUBLIC CUDA::cudart)
-
-target_link_libraries(neural_architecture_layer PRIVATE neural_fm_cuda)
+target_sources(neural_architecture_layer PRIVATE ${SNEPPX_FM_CUDA_SRC})
+target_include_directories(neural_architecture_layer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(neural_architecture_layer PRIVATE CUDA::cudart)

@@ -1,18 +1,9 @@
 # NCCL based distributed communication backend.
 # NCCL is loaded dynamically at runtime (see nccl.c), so the build does not
-# require NCCL headers or libraries to be present.
+# require NCCL headers or libraries to be present. The source is compiled
+# directly into the core kernel library.
 
-add_library(neural_net_distributed STATIC nccl.c)
-
-target_include_directories(neural_net_distributed PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-
-if(SNEPPX_BUILD_CUDA)
-    target_link_libraries(neural_net_distributed PUBLIC CUDA::cudart)
-    target_compile_definitions(neural_net_distributed PRIVATE SNEPPX_HAS_CUDA)
-endif()
-
-# Expose the distributed backend through the core kernel library.
-target_link_libraries(neural_core_kernel PRIVATE neural_net_distributed)
+target_sources(neural_core_kernel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/nccl.c)
+target_include_directories(neural_core_kernel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(neural_core_kernel PRIVATE CUDA::cudart)
+target_compile_definitions(neural_core_kernel PRIVATE SNEPPX_HAS_CUDA)
