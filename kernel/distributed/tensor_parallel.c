@@ -1,19 +1,43 @@
 #include "../../include/neural_core/architecture/distributed.h"
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
+#ifdef SNEPPX_HAS_CUDA
 #include <cublas_v2.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-// ============================================================================
-// Tensor Parallelism (Row/Column Split Linear)
-// ============================================================================
-
 struct SNEPPX_TensorParallel {
     int tp_size;
     int tp_rank;
     int use_nccl;
 };
+
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+int sneppx_tp_init(SNEPPX_TensorParallel** tp,                    const SNEPPX_DistributedConfig* config)  {
+    return -1;
+}
+
+int sneppx_tp_linear_forward(SNEPPX_TensorParallel* tp,                               const float* input, const float* weight,                               float* output, int m, int n, int k,                               cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_tp_all_reduce(SNEPPX_TensorParallel* tp,                           float* data, int size,                           cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_tp_destroy(SNEPPX_TensorParallel* tp)  {
+    return -1;
+}
+
+#else
+
+// ============================================================================
+// Tensor Parallelism (Row/Column Split Linear)
+// ============================================================================
+
 
 // Forward declarations for NCCL
 extern int sneppx_nccl_all_reduce(
@@ -95,3 +119,4 @@ int sneppx_tp_destroy(SNEPPX_TensorParallel* tp) {
     free(tp);
     return 0;
 }
+#endif /* SNEPPX_HAS_CUDA */

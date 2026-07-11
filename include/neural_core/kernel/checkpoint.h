@@ -4,6 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef SNEPPX_HAS_CUDA
+#include <cuda_runtime.h>
+#else
+typedef void* cudaStream_t;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

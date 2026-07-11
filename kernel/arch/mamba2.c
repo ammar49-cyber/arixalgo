@@ -1,20 +1,40 @@
 #include "../../include/neural_core/architecture/advanced_arch.h"
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
+#ifdef SNEPPX_HAS_CUDA
 #include <cublas_v2.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+struct SNEPPX_Mamba2Block {
+    float *in_proj, *conv1d, *out_proj, *A_log, *D;
+    int dim, d_state, d_conv;
+    int use_fp32;
+};
+
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+int sneppx_mamba2_init(SNEPPX_Mamba2Block** mb, int dim, int d_state, int d_conv)  {
+    return -1;
+}
+
+int sneppx_mamba2_forward(SNEPPX_Mamba2Block* mb, const float* x,                            float* output, int batch, int seq_len)  {
+    return -1;
+}
+
+int sneppx_mamba2_destroy(SNEPPX_Mamba2Block* mb)  {
+    return -1;
+}
+
+#else
 
 // ============================================================================
 // Mamba-2: Selective State Space Model
 // torch.nn.Conv1d + selective scan with discretized SSM
 // ============================================================================
 
-struct SNEPPX_Mamba2Block {
-    float *in_proj, *conv1d, *out_proj, *A_log, *D;
-    int dim, d_state, d_conv;
-    int use_fp32;
-};
 
 int sneppx_mamba2_init(SNEPPX_Mamba2Block** mb, int dim, int d_state, int d_conv) {
     if (!mb) return -1;
@@ -114,3 +134,4 @@ int sneppx_mamba2_destroy(SNEPPX_Mamba2Block* mb) {
     free(mb);
     return 0;
 }
+#endif /* SNEPPX_HAS_CUDA */

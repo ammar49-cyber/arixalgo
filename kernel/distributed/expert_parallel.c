@@ -1,13 +1,10 @@
 #include "../../include/neural_core/architecture/distributed.h"
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-// ============================================================================
-// Expert Parallelism (Distributed MoE via All-to-All)
-// ============================================================================
-
 struct SNEPPX_ExpertParallel {
     int num_experts;
     int num_local_experts;
@@ -16,6 +13,35 @@ struct SNEPPX_ExpertParallel {
     int* expert_to_rank;
     int* local_expert_ids;
 };
+
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+int sneppx_ep_init(SNEPPX_ExpertParallel** ep,                    const SNEPPX_DistributedConfig* config)  {
+    return -1;
+}
+
+int sneppx_ep_all_to_all(SNEPPX_ExpertParallel* ep,                           const float* sendbuf, float* recvbuf,                           int send_size, int recv_size,                           cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_ep_destroy(SNEPPX_ExpertParallel* ep)  {
+    return -1;
+}
+
+int sneppx_fm_distributed_all_reduce(float* data, int size,                                       const SNEPPX_DistributedConfig* config,                                       cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_fm_distributed_broadcast(float* data, int size, int root,                                      const SNEPPX_DistributedConfig* config,                                      cudaStream_t stream)  {
+    return -1;
+}
+
+#else
+
+// ============================================================================
+// Expert Parallelism (Distributed MoE via All-to-All)
+// ============================================================================
+
 
 int sneppx_ep_init(SNEPPX_ExpertParallel** ep,
                    const SNEPPX_DistributedConfig* config) {
@@ -97,3 +123,4 @@ int sneppx_fm_distributed_broadcast(float* data, int size, int root,
     // Placeholder: in real implementation, calls NCCL broadcast
     return 0;
 }
+#endif /* SNEPPX_HAS_CUDA */

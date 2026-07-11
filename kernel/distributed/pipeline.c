@@ -1,13 +1,10 @@
 #include "../../include/neural_core/architecture/distributed.h"
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-// ============================================================================
-// Pipeline Parallelism (1F1B Schedule)
-// ============================================================================
-
 struct SNEPPX_PipelineParallel {
     int num_stages;
     int stage_id;
@@ -25,6 +22,31 @@ struct SNEPPX_PipelineParallel {
     float* send_buffer;
     size_t buffer_size;
 };
+
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+int sneppx_pipeline_init(SNEPPX_PipelineParallel** pp,                          const SNEPPX_DistributedConfig* config)  {
+    return -1;
+}
+
+int sneppx_pipeline_forward(SNEPPX_PipelineParallel* pp,                              void* input, void** output,                              cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_pipeline_backward(SNEPPX_PipelineParallel* pp,                               void* grad_output,                               cudaStream_t stream)  {
+    return -1;
+}
+
+int sneppx_pipeline_destroy(SNEPPX_PipelineParallel* pp)  {
+    return -1;
+}
+
+#else
+
+// ============================================================================
+// Pipeline Parallelism (1F1B Schedule)
+// ============================================================================
+
 
 int sneppx_pipeline_init(SNEPPX_PipelineParallel** pp,
                          const SNEPPX_DistributedConfig* config) {
@@ -117,3 +139,4 @@ int sneppx_pipeline_destroy(SNEPPX_PipelineParallel* pp) {
     free(pp);
     return 0;
 }
+#endif /* SNEPPX_HAS_CUDA */

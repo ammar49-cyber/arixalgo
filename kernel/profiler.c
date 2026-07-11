@@ -1,9 +1,70 @@
 #include "neural_core/kernel/profiler.h"
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+void SNEPPX_range_push(const char* name)  {
+    return -1;
+}
+
+void SNEPPX_range_pop(void)  {
+    return -1;
+}
+
+int SNEPPX_range_get_depth(void)  {
+    return -1;
+}
+
+int SNEPPX_kernel_timer_init(SNEPPX_KernelTimer* kt)  {
+    return -1;
+}
+
+void SNEPPX_kernel_timer_start(SNEPPX_KernelTimer* kt, cudaStream_t stream)  {
+    return -1;
+}
+
+float SNEPPX_kernel_timer_stop(SNEPPX_KernelTimer* kt, cudaStream_t stream)  {
+    return -1;
+}
+
+void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt)  {
+    return -1;
+}
+
+int SNEPPX_profiler_init(SNEPPX_Profiler* prof)  {
+    return -1;
+}
+
+void SNEPPX_profiler_destroy(SNEPPX_Profiler* prof)  {
+    return -1;
+}
+
+void SNEPPX_profiler_enable(SNEPPX_Profiler* prof, int enabled)  {
+    return -1;
+}
+
+int SNEPPX_profiler_record(SNEPPX_Profiler* prof, const char* name, float elapsed_ms)  {
+    return -1;
+}
+
+void SNEPPX_profiler_reset(SNEPPX_Profiler* prof)  {
+    return -1;
+}
+
+void SNEPPX_profiler_print(const SNEPPX_Profiler* prof)  {
+    return -1;
+}
+
+char* SNEPPX_profiler_to_json(const SNEPPX_Profiler* prof)  {
+    return -1;
+}
+
+#else
 
 /* =========================================================================
  * Range marker stack (lightweight NVTX substitute)
@@ -174,3 +235,4 @@ char* SNEPPX_profiler_to_json(const SNEPPX_Profiler* prof) {
     pos += snprintf(buf + pos, cap - pos, "  ]\n}\n");
     return buf;
 }
+#endif /* SNEPPX_HAS_CUDA */

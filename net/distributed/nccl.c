@@ -11,28 +11,11 @@
 // Falls back to a CPU-based simulated all-reduce if NCCL is unavailable.
 // ============================================================================
 
+#ifdef SNEPPX_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 
 // Function pointer table for NCCL operations
-typedef struct {
-    void* handle;
-    
-    // NCCL function pointers
-    int (*ncclGetVersion)(int*);
-    int (*ncclGetUniqueId)(void*);
-    int (*ncclCommInitRank)(void**, int, void*, int);
-    int (*ncclCommDestroy)(void*);
-    int (*ncclAllReduce)(const void*, void*, size_t, int, int, void*, void*);
-    int (*ncclBroadcast)(const void*, void*, size_t, int, int, void*, void*);
-    int (*ncclReduce)(const void*, void*, size_t, int, int, int, void*, void*);
-    int (*ncclAllGather)(const void*, void*, size_t, int, void*, void*);
-    int (*ncclReduceScatter)(const void*, void*, size_t, int, int, void*, void*);
-    int (*ncclSend)(const void*, size_t, int, int, void*, void*);
-    int (*ncclRecv)(void*, size_t, int, int, void*, void*);
-    int (*ncclGetErrorString)(int, const char**);
-    
-    int loaded;
-} SNEPPX_NCCLBackend;
 
 static SNEPPX_NCCLBackend g_nccl_backend = {0};
 static int g_nccl_initialized = 0;
@@ -104,12 +87,6 @@ static int sneppx_nccl_try_load(void) {
 // NCCL API Implementation
 // ============================================================================
 
-struct SNEPPX_NCCLComm {
-    void* nccl_comm;
-    int rank;
-    int size;
-    int use_nccl;
-};
 
 int sneppx_nccl_initialize(void) {
     if (g_nccl_initialized) return 0;
@@ -399,6 +376,104 @@ int sneppx_dlclose(void* handle) {
 
 #else
 #include <dlfcn.h>
+typedef struct {
+    void* handle;
+    
+    // NCCL function pointers
+    int (*ncclGetVersion)(int*);
+    int (*ncclGetUniqueId)(void*);
+    int (*ncclCommInitRank)(void**, int, void*, int);
+    int (*ncclCommDestroy)(void*);
+    int (*ncclAllReduce)(const void*, void*, size_t, int, int, void*, void*);
+    int (*ncclBroadcast)(const void*, void*, size_t, int, int, void*, void*);
+    int (*ncclReduce)(const void*, void*, size_t, int, int, int, void*, void*);
+    int (*ncclAllGather)(const void*, void*, size_t, int, void*, void*);
+    int (*ncclReduceScatter)(const void*, void*, size_t, int, int, void*, void*);
+    int (*ncclSend)(const void*, size_t, int, int, void*, void*);
+    int (*ncclRecv)(void*, size_t, int, int, void*, void*);
+    int (*ncclGetErrorString)(int, const char**);
+    
+    int loaded;
+} SNEPPX_NCCLBackend;
+
+struct SNEPPX_NCCLComm {
+    void* nccl_comm;
+    int rank;
+    int size;
+    int use_nccl;
+};
+
+#ifndef SNEPPX_HAS_CUDA
+// CPU fallback stubs (CUDA not available)
+int sneppx_nccl_initialize(void)  {
+    return -1;
+}
+
+int sneppx_nccl_finalize(void)  {
+    return -1;
+}
+
+int sneppx_nccl_comm_init_rank(     SNEPPX_NCCLComm** comm,     int ndev, int rank, int* devs )  {
+    return -1;
+}
+
+int sneppx_nccl_comm_destroy(SNEPPX_NCCLComm* comm)  {
+    return -1;
+}
+
+int sneppx_nccl_comm_rank(const SNEPPX_NCCLComm* comm, int* rank)  {
+    return -1;
+}
+
+int sneppx_nccl_comm_size(const SNEPPX_NCCLComm* comm, int* size)  {
+    return -1;
+}
+
+int sneppx_nccl_all_reduce(     const void* sendbuf, void* recvbuf, size_t count,     SNEPPX_NCCL_DataType datatype, SNEPPX_NCCL_RedOp op,     SNEPPX_NCCLComm* comm, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_nccl_all_gather(     const void* sendbuf, void* recvbuf, size_t sendcount,     SNEPPX_NCCL_DataType datatype,     SNEPPX_NCCLComm* comm, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_nccl_send(     const void* buf, size_t count,     SNEPPX_NCCL_DataType datatype, int peer,     SNEPPX_NCCLComm* comm, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_nccl_recv(     void* buf, size_t count,     SNEPPX_NCCL_DataType datatype, int peer,     SNEPPX_NCCLComm* comm, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_nccl_all_reduce_grads(     SNEPPX_NCCLComm* comm, void** grads, size_t* sizes,     int num_grads, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_pg_create(     SNEPPX_ProcessGroup** pg, int world_size, int rank )  {
+    return -1;
+}
+
+int sneppx_pg_destroy(SNEPPX_ProcessGroup* pg)  {
+    return -1;
+}
+
+int sneppx_pg_all_reduce(     SNEPPX_ProcessGroup* pg, void* data, size_t count,     SNEPPX_NCCL_DataType datatype, SNEPPX_NCCL_RedOp op,     cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_pg_barrier(     SNEPPX_ProcessGroup* pg, cudaStream_t stream )  {
+    return -1;
+}
+
+int sneppx_dlclose(void* handle)  {
+    return -1;
+}
+
+int sneppx_dlclose(void* handle)  {
+    return -1;
+}
+
+#else
 
 void* sneppx_dlopen(const char* lib, int flags) {
     return dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
@@ -412,3 +487,4 @@ int sneppx_dlclose(void* handle) {
     return dlclose(handle);
 }
 #endif
+#endif /* SNEPPX_HAS_CUDA */
