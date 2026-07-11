@@ -62,7 +62,7 @@ jobs:
   # =====================================================================
   build-linux:
     name: Build Linux (${{ matrix.build_type }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         build_type: [Release, Debug]
@@ -218,7 +218,7 @@ jobs:
   # =====================================================================
   build-python:
     name: Build Python Package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
