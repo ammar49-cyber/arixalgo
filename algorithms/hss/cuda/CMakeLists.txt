@@ -14,4 +14,4 @@ target_link_libraries(neural_hss_cuda PUBLIC
     CUDA::cufft
 )
 
-target_link_libraries(neural_architecture_layer PUBLIC neural_hss_cuda)
+target_link_libraries(neural_architecture_layer PRIVATE neural_hss_cuda)

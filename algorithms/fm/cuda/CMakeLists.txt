@@ -11,4 +11,4 @@ target_include_directories(neural_fm_cuda PUBLIC
 
 target_link_libraries(neural_fm_cuda PUBLIC CUDA::cudart)
 
-target_link_libraries(neural_architecture_layer PUBLIC neural_fm_cuda)
+target_link_libraries(neural_architecture_layer PRIVATE neural_fm_cuda)

@@ -15,4 +15,4 @@ if(SNEPPX_BUILD_CUDA)
 endif()
 
 # Expose the distributed backend through the core kernel library.
-target_link_libraries(neural_core_kernel PUBLIC neural_net_distributed)
+target_link_libraries(neural_core_kernel PRIVATE neural_net_distributed)

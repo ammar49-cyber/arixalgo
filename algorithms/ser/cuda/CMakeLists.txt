@@ -11,4 +11,4 @@ target_include_directories(neural_ser_cuda PUBLIC
 
 target_link_libraries(neural_ser_cuda PUBLIC CUDA::cudart)
 
-target_link_libraries(neural_architecture_layer PUBLIC neural_ser_cuda)
+target_link_libraries(neural_architecture_layer PRIVATE neural_ser_cuda)
