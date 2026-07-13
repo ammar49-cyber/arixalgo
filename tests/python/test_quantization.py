@@ -4,14 +4,21 @@ import numpy as np
 from SneppX_ALG.interface_bindings import Tensor
 from SneppX_ALG.interface_bindings.quantization import (
     QuantMode,
-    quantize_int8_sym, dequantize_int8_sym,
-    quantize_int8_asym, dequantize_int8_asym,
+    quantize_int8_sym,
+    dequantize_int8_sym,
+    quantize_int8_asym,
+    dequantize_int8_asym,
     quantize_int8_channel,
-    quantize_int4_sym, dequantize_int4_sym,
-    quantize_fp8_e4m3, dequantize_fp8_e4m3,
-    quantize_fp8_e5m2, dequantize_fp8_e5m2,
-    awq_scale_weights, awq_quantize,
-    gptq_compute_hessian, gptq_quantize,
+    quantize_int4_sym,
+    dequantize_int4_sym,
+    quantize_fp8_e4m3,
+    dequantize_fp8_e4m3,
+    quantize_fp8_e5m2,
+    dequantize_fp8_e5m2,
+    awq_scale_weights,
+    awq_quantize,
+    gptq_compute_hessian,
+    gptq_quantize,
     QuantizedLinear,
     quantize_error,
 )
@@ -90,7 +97,7 @@ def test_fp8_e5m2_roundtrip():
 
 
 def test_fp8_special_values():
-    x = Tensor([0.0, float('inf'), float('-inf')])
+    x = Tensor([0.0, float("inf"), float("-inf")])
     q_e4m3 = quantize_fp8_e4m3(x)
     dq_e4m3 = dequantize_fp8_e4m3(q_e4m3)
     assert dq_e4m3.data[0] == 0.0
@@ -145,6 +152,7 @@ def test_gptq_quantize_no_hessian():
 
 def test_quantized_linear():
     from SneppX_ALG.interface_bindings.nn import Linear
+
     linear = Linear(8, 16)
     qlinear = QuantizedLinear.from_float(linear, mode=QuantMode.INT8_SYM)
     x = Tensor.randn((2, 8))
@@ -155,6 +163,7 @@ def test_quantized_linear():
 
 def test_quantized_linear_asym():
     from SneppX_ALG.interface_bindings.nn import Linear
+
     linear = Linear(8, 16)
     qlinear = QuantizedLinear.from_float(linear, mode=QuantMode.INT8_ASYM)
     x = Tensor.randn((2, 8))
@@ -171,8 +180,10 @@ def test_quantize_error_metrics():
     snr = quantize_error(x, y, "snr")
     assert mse > 0
     assert mae > 0
-    assert snr < float('inf')
-    print(f"  test_quantize_error_metrics: MSE={mse:.6f} MAE={mae:.6f} SNR={snr:.1f}dB PASS")
+    assert snr < float("inf")
+    print(
+        f"  test_quantize_error_metrics: MSE={mse:.6f} MAE={mae:.6f} SNR={snr:.1f}dB PASS"
+    )
 
 
 if __name__ == "__main__":

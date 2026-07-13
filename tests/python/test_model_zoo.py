@@ -1,19 +1,37 @@
 import sys, os, json, tempfile
-if '__file__' in globals():
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../bindings/python'))
+
+if "__file__" in globals():
+    sys.path.insert(
+        0,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "../../bindings/python"
+        ),
+    )
 else:
-    sys.path.insert(0, os.path.join(os.getcwd(), 'tests/python/../../bindings/python'))
+    sys.path.insert(0, os.path.join(os.getcwd(), "tests/python/../../bindings/python"))
 
 from SneppX_ALG.interface_bindings.model_zoo import (
-    ModelFamily, LlamaConfig, MistralConfig, Qwen2Config, DeepSeekV2Config,
-    get_model_config, config_from_json, list_available_models,
-    _remap_hf_weight_name, _generate_sneppx_weight_names,
-    read_safetensors, convert_hf_to_sneppx,
-    build_model_from_config, build_transformer_from_config,
-    from_pretrained, _MODEL_REGISTRY, HF_WEIGHT_MAP,
+    ModelFamily,
+    LlamaConfig,
+    MistralConfig,
+    Qwen2Config,
+    DeepSeekV2Config,
+    get_model_config,
+    config_from_json,
+    list_available_models,
+    _remap_hf_weight_name,
+    _generate_sneppx_weight_names,
+    read_safetensors,
+    convert_hf_to_sneppx,
+    build_model_from_config,
+    build_transformer_from_config,
+    from_pretrained,
+    _MODEL_REGISTRY,
+    HF_WEIGHT_MAP,
 )
 
 failed = []
+
 
 def check(name, cond):
     if not cond:
@@ -21,6 +39,7 @@ def check(name, cond):
         failed.append(name)
     else:
         print(f"  PASS {name}")
+
 
 def test_get_model_config():
     c = get_model_config("llama2", "7B")
@@ -37,6 +56,7 @@ def test_get_model_config():
     check("deepseek lite kv_lora", c["kv_lora_rank"] == 512)
     check("deepseek lite q_lora", c["q_lora_rank"] == 1536)
 
+
 def test_get_model_config_errors():
     try:
         get_model_config("unknown", "7B")
@@ -49,6 +69,7 @@ def test_get_model_config_errors():
     except ValueError:
         check("unknown size raises", True)
 
+
 def test_list_available():
     models = list_available_models()
     check("has llama2:7B", "llama2:7B" in models)
@@ -58,8 +79,9 @@ def test_list_available():
     check("has deepseek_v2:lite", "deepseek_v2:lite" in models)
     check("has deepseek_v2:full", "deepseek_v2:full" in models)
 
+
 def test_config_from_json():
-    with tempfile.NamedTemporaryFile(suffix='.json', mode='w', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
         json.dump({"family": "llama3", "hidden_size": 4096, "num_hidden_layers": 32}, f)
         path = f.name
     try:
@@ -67,6 +89,7 @@ def test_config_from_json():
         check("json load family", c["family"] == "llama3")
     finally:
         os.unlink(path)
+
 
 def test_remap_hf_weight_name():
     # Non-layer
@@ -80,17 +103,23 @@ def test_remap_hf_weight_name():
     result = _remap_hf_weight_name("model.layers.5.input_layernorm.weight", "llama2")
     check("layernorm remap", result == "layers.5.attn_norm.weight")
 
+
 def test_remap_unknown_family():
     result = _remap_hf_weight_name("model.embed_tokens.weight", "unknown")
     check("unknown family", result is None)
+
 
 def test_remap_unmappable():
     result = _remap_hf_weight_name("model.layers.0.foo.bar.weight", "llama2")
     check("unmapped layer", result is None)
 
+
 def test_remap_deepseek():
-    result = _remap_hf_weight_name("model.layers.0.self_attn.kv_b_proj.weight", "deepseek_v2")
+    result = _remap_hf_weight_name(
+        "model.layers.0.self_attn.kv_b_proj.weight", "deepseek_v2"
+    )
     check("deepseek kv_b_proj", result == "layers.0.attn.kv_b_proj.weight")
+
 
 def test_generate_weight_names():
     names = _generate_sneppx_weight_names("llama2", 2)
@@ -99,6 +128,7 @@ def test_generate_weight_names():
     check("embedding first", names[0] == "embedding.weight")
     check("layer 0 attn_norm", "layers.0.attn_norm.weight" in names)
     check("layer 1 down_proj", "layers.1.mlp.down_proj.weight" in names)
+
 
 def test_build_model_from_config():
     config = get_model_config("llama3", "8B")
@@ -109,17 +139,20 @@ def test_build_model_from_config():
     check("layers", info["layers"] == 32)
     check("hidden_size", info["hidden_size"] == 4096)
 
+
 def test_build_model_deepseek():
     config = get_model_config("deepseek_v2", "lite")
     info = build_model_from_config(config)
     check("deepseek has_mla", info.get("has_mla") == True)
     check("deepseek kv_lora_rank", info.get("kv_lora_rank") == 512)
 
+
 def test_from_pretrained():
     info = from_pretrained("meta-llama/Llama-3-8B-hf", verbose=False)
     check("from_pretrained family", info["family"] == "llama3")
     check("from_pretrained size", info["size"] == "8B")
     check("from_pretrained params", "B" in info.get("param_str", ""))
+
 
 def test_from_pretrained_all():
     models = [
@@ -143,8 +176,10 @@ def test_from_pretrained_all():
         check(f"{family} {size} from_pretrained", info["family"] == family)
         check(f"{family} {size}", info["family"] == family)
 
+
 def test_build_transformer():
     from SneppX_ALG.interface_bindings.nn import Module
+
     # Use a tiny config to keep test fast
     config = {
         "hidden_size": 64,
@@ -162,6 +197,7 @@ def test_build_transformer():
     params = model.parameters()
     check("has parameters", len(params) > 0)
 
+
 def test_safetensors_reader_invalid():
     try:
         read_safetensors("nonexistent_file.safetensors")
@@ -170,6 +206,7 @@ def test_safetensors_reader_invalid():
         check("invalid file raises", True)
     except Exception:
         check("invalid file raises", True)
+
 
 def test_dataclass_defaults():
     lc = LlamaConfig()
@@ -182,7 +219,7 @@ def test_dataclass_defaults():
     check("DeepSeekV2 KV lora", dc.kv_lora_rank == 512)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_get_model_config()
     test_get_model_config_errors()
     test_list_available()
@@ -200,4 +237,6 @@ if __name__ == '__main__':
     test_safetensors_reader_invalid()
     test_dataclass_defaults()
 
-    print(f"\n{'All model zoo tests passed!' if not failed else f'{len(failed)} failures: {failed}'}")
+    print(
+        f"\n{'All model zoo tests passed!' if not failed else f'{len(failed)} failures: {failed}'}"
+    )

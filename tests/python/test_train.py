@@ -3,9 +3,12 @@
 import numpy as np
 from SneppX_ALG.interface_bindings import (
     Tensor,
-    Trainer, TrainConfig,
-    MSELoss, CrossEntropyLoss,
-    DataLoader, CppTensorDataset,
+    Trainer,
+    TrainConfig,
+    MSELoss,
+    CrossEntropyLoss,
+    DataLoader,
+    CppTensorDataset,
     _HAS_C_BACKEND,
 )
 from SneppX_ALG.interface_bindings.model import Model, ModelConfig
@@ -59,6 +62,7 @@ def test_trainer_train_eval():
 
 def test_trainer_save_load_checkpoints():
     import tempfile, os
+
     mcfg = ModelConfig()
     mcfg.input_dim = 8
     mcfg.output_dim = 8
@@ -67,7 +71,7 @@ def test_trainer_save_load_checkpoints():
     config.learning_rate = 0.01
     config.batch_size = 4
     trainer = Trainer(model, config)
-    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".ckpt", delete=False) as f:
         path = f.name
     try:
         trainer.save_checkpoint(path)
@@ -119,7 +123,7 @@ def test_dataloader():
     print(f"  test_dataloader: {len(batches)} batches PASS")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_train_config()
     test_trainer_create()
     test_trainer_train_eval()

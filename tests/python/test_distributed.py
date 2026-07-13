@@ -3,11 +3,17 @@
 import os
 import numpy as np
 from SneppX_ALG.interface_bindings import (
-    Tensor, Linear, Module,
-    DistributedContext, DistributedSampler,
+    Tensor,
+    Linear,
+    Module,
+    DistributedContext,
+    DistributedSampler,
     DistributedDataParallel,
-    init_process_group, destroy_process_group,
-    get_world_size, get_rank, all_reduce,
+    init_process_group,
+    destroy_process_group,
+    get_world_size,
+    get_rank,
+    all_reduce,
     _HAS_C_BACKEND,
 )
 

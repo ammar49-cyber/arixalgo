@@ -4,8 +4,13 @@ import numpy as np
 import tempfile
 import os
 from SneppX_ALG.interface_bindings import (
-    Tensor, Dataset, TensorDataset, TextDataset,
-    SimpleTokenizer, BatchCollator, Preprocessor,
+    Tensor,
+    Dataset,
+    TensorDataset,
+    TextDataset,
+    SimpleTokenizer,
+    BatchCollator,
+    Preprocessor,
 )
 
 

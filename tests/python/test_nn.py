@@ -2,10 +2,22 @@
 
 import numpy as np
 from SneppX_ALG.interface_bindings import (
-    Tensor, Module, Linear, Embedding, Dropout,
-    LayerNorm, RMSNorm,
-    GELU, SiLU, ReLU, Sigmoid, Tanh,
-    Sequential, MultiheadAttention, TransformerBlock, Transformer,
+    Tensor,
+    Module,
+    Linear,
+    Embedding,
+    Dropout,
+    LayerNorm,
+    RMSNorm,
+    GELU,
+    SiLU,
+    ReLU,
+    Sigmoid,
+    Tanh,
+    Sequential,
+    MultiheadAttention,
+    TransformerBlock,
+    Transformer,
 )
 
 
@@ -91,7 +103,7 @@ def test_rmsnorm():
     x = Tensor.randn((2, 4))
     out = rn(x)
     assert out.shape == (2, 4)
-    rms = np.sqrt((out.data ** 2).mean(axis=-1))
+    rms = np.sqrt((out.data**2).mean(axis=-1))
     assert np.allclose(rms, 1, atol=1e-4), f"rms={rms}"
     print("  test_rmsnorm PASS")
 
@@ -101,7 +113,10 @@ def test_activations():
     assert np.allclose(ReLU()(x).data, [0, 0, 0, 1, 2])
     assert np.allclose(Sigmoid()(x).data, 1 / (1 + np.exp(-x.data)))
     assert np.allclose(Tanh()(x).data, np.tanh(x.data))
-    assert np.allclose(GELU()(x).data, 0.5 * x.data * (1 + np.tanh(0.79788456 * (x.data + 0.044715 * x.data**3))))
+    assert np.allclose(
+        GELU()(x).data,
+        0.5 * x.data * (1 + np.tanh(0.79788456 * (x.data + 0.044715 * x.data**3))),
+    )
     assert np.allclose(SiLU()(x).data, x.data * (1 / (1 + np.exp(-x.data))))
     print("  test_activations PASS")
 

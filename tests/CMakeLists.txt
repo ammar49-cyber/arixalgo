@@ -5,11 +5,11 @@ file(GLOB_RECURSE SECURITY_TEST_SRCS ../tests/security/*.c)
 # Tests excluded because they reference APIs that were never implemented
 set(EXCLUDED_TESTS
     test_activation test_arch test_aslr test_canary
-    test_checkpoint test_cuda_driver test_data_pipeline
-    test_hashtable test_hss_discretize test_hss_hierarchical
+    test_data_pipeline
+    test_hss_discretize test_hss_hierarchical
     test_inference_engine test_lock test_obf_pipeline
-    test_power test_pqueue test_rbtree test_rocm_driver
-    test_ser_loss test_strutil test_tpu_driver
+    test_power test_rocm_driver
+    test_ser_loss
 )
 
 macro(add_neural_test test_src link_libs)

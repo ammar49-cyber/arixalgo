@@ -4,14 +4,20 @@ import numpy as np
 import tempfile
 import os
 import json
-from SneppX_ALG.interface_bindings import Tensor, Linear, Sequential, load_config, save_hf_model
+from SneppX_ALG.interface_bindings import (
+    Tensor,
+    Linear,
+    Sequential,
+    load_config,
+    save_hf_model,
+)
 
 
 def test_save_and_load_config():
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = os.path.join(tmpdir, "config.json")
         config = {"model_id": "test", "architectures": ["SneppxForCausalLM"]}
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(config, f)
         loaded = load_config(config_path)
         assert loaded["model_id"] == "test"
@@ -35,9 +41,10 @@ def test_save_hf_model_weights_roundtrip():
     orig_params = [p.data.copy() for p in model.parameters()]
     with tempfile.TemporaryDirectory() as tmpdir:
         save_hf_model(model, tmpdir, model_id="test-model")
-        with open(os.path.join(tmpdir, "model.safetensors"), 'rb') as f:
+        with open(os.path.join(tmpdir, "model.safetensors"), "rb") as f:
             import struct
-            header_size = struct.unpack('<Q', f.read(8))[0]
+
+            header_size = struct.unpack("<Q", f.read(8))[0]
             header = json.loads(f.read(header_size))
             assert len(header) == len(orig_params)
     print("  test_save_hf_model_weights_roundtrip PASS")

@@ -1,6 +1,9 @@
 import sys, os, time, math
 import tempfile, shutil, json, numpy as np
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../bindings/python'))
+
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../bindings/python")
+)
 import SneppX_ALG.interface_bindings.tensor as tensor
 
 from SneppX_ALG.interface_bindings.profiler import Timer
@@ -13,6 +16,7 @@ from SneppX_ALG.interface_bindings.quantization import quantize_int8_sym
 from SneppX_ALG.interface_bindings.model_zoo import get_model_config
 from SneppX_ALG.interface_bindings.checkpoint import CheckpointCoordinator
 
+
 # Simple test model
 class SimpleModel(Module):
     def __init__(self):
@@ -24,20 +28,23 @@ class SimpleModel(Module):
         x = self.fc1(x)
         return self.fc2(x)
 
+
 # Minimal training loop
 def test_basic_training():
     from SneppX_ALG.interface_bindings.optimizer import SGD
 
     model = SimpleModel()
-    optimizer = SGD([p for m in [model.fc1, model.fc2] for p in m.parameters()], lr=0.01)
-    
+    optimizer = SGD(
+        [p for m in [model.fc1, model.fc2] for p in m.parameters()], lr=0.01
+    )
+
     # Create synthetic data
     data = []
     for i in range(10):
         inp = [float(i) / 10.0] * 10
         tgt = [float(i) / 10.0]
         data.append((inp, tgt))
-    
+
     total_loss = 0.0
     for epoch in range(10):
         epoch_loss = 0.0
@@ -61,6 +68,7 @@ def test_basic_training():
     assert avg_loss < 1.0, f"Loss too high: {avg_loss}"
     print(f"Basic training completed: avg loss {avg_loss:.4f}")
 
+
 def test_autocast():
     with autocast(enabled=True, dtype="float16"):
         with Timer("autocast_block"):
@@ -74,13 +82,17 @@ def test_autocast():
             result = c.sum()
             print(f"  Autocast done, dtype = {a.dtype_name}")
 
+
 def test_amp():
-    scaler = GradScaler(init_scale=2.0 ** 16, growth_factor=2.0)
-    params = [SneppX_ALG.interface_bindings.tensor.Tensor.from_numpy(
-        np.array([1.0, 2.0, 3.0], dtype=np.float32), dtype="float32"
-    )]
+    scaler = GradScaler(init_scale=2.0**16, growth_factor=2.0)
+    params = [
+        SneppX_ALG.interface_bindings.tensor.Tensor.from_numpy(
+            np.array([1.0, 2.0, 3.0], dtype=np.float32), dtype="float32"
+        )
+    ]
     loss = params[0] * params[0]
     print(f"  AMPLoss (scaled): {float(loss.data)}")
+
 
 def test_schedule():
     model = SimpleModel()
@@ -90,11 +102,13 @@ def test_schedule():
     scheduler.step()
     print(f"  Scheduler LR after step: {optimizer.lr}")
 
+
 def test_checkpointing():
     ckpt_dir = tempfile.mkdtemp()
     try:
-        coord = CheckpointCoordinator(ckpt_dir, world_size=1, rank=0,
-                                      save_interval=1, async_save=False)
+        coord = CheckpointCoordinator(
+            ckpt_dir, world_size=1, rank=0, save_interval=1, async_save=False
+        )
         data = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         coord.save(data, step=42, metadata={"epoch": 1})
         time.sleep(0.1)
@@ -104,12 +118,14 @@ def test_checkpointing():
     finally:
         shutil.rmtree(ckpt_dir, ignore_errors=True)
 
+
 def test_quantization():
     inp = SneppX_ALG.interface_bindings.tensor.Tensor.from_numpy(
         np.array([1.0, 2.0, 3.0, 4.0]), dtype="float32"
     )
     quant_tensor, scale = quantize_int8_sym(inp)
     print(f"  INT8 quantized: scale={scale:.4f}, dtype={quant_tensor.dtype_name}")
+
 
 def test_model_zoo():
     config = get_model_config("llama3", "8B")
@@ -136,6 +152,7 @@ def main():
     print("\n7. Model zoo configs")
     test_model_zoo()
     print("\n=== All UltraTrainer tests passed! ===")
+
 
 if __name__ == "__main__":
     main()

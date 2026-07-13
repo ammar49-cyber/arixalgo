@@ -1,15 +1,28 @@
 import sys, os, time, json
-if '__file__' in globals():
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../bindings/python'))
+
+if "__file__" in globals():
+    sys.path.insert(
+        0,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "../../bindings/python"
+        ),
+    )
 else:
-    sys.path.insert(0, os.path.join(os.getcwd(), 'tests/python/../../bindings/python'))
+    sys.path.insert(0, os.path.join(os.getcwd(), "tests/python/../../bindings/python"))
 
 from SneppX_ALG.interface_bindings.profiler import (
-    Profiler, ProfileEntry, Timer, MemoryTracker, TrainProfiler,
-    timeit, get_profiler, _GLOBAL_PROFILER
+    Profiler,
+    ProfileEntry,
+    Timer,
+    MemoryTracker,
+    TrainProfiler,
+    timeit,
+    get_profiler,
+    _GLOBAL_PROFILER,
 )
 
 failed = []
+
 
 def check(name, cond):
     if not cond:
@@ -17,6 +30,7 @@ def check(name, cond):
         failed.append(name)
     else:
         print(f"  PASS {name}")
+
 
 def test_profiler_record():
     p = Profiler()
@@ -30,10 +44,12 @@ def test_profiler_record():
     check("op2 calls", p.get("op2") and p.get("op2").num_calls == 1)
     check("op3 missing", p.get("op3") is None)
 
+
 def test_profiler_disabled():
     p = Profiler(enabled=False)
     p.record("op", 1.0)
     check("disabled no record", p.get("op") is None)
+
 
 def test_profiler_reset():
     p = Profiler()
@@ -41,6 +57,7 @@ def test_profiler_reset():
     p.reset()
     check("reset clears", p.get("a") is None)
     check("no entries", len(p._entries) == 0)
+
 
 def test_timer_context():
     t = Timer("test_op")
@@ -50,6 +67,7 @@ def test_timer_context():
     e = get_profiler().get("test_op")
     check("timer recorded in global", e is not None)
 
+
 def test_timer_start_stop():
     t = Timer("manual")
     t.start()
@@ -57,21 +75,28 @@ def test_timer_start_stop():
     elapsed = t.stop()
     check("manual timer", elapsed >= 0.003)
 
+
 def test_timeit_decorator():
     _GLOBAL_PROFILER.reset()
+
     @timeit("decorated_fn")
     def dummy():
         time.sleep(0.005)
+
     dummy()
     e = _GLOBAL_PROFILER.get("decorated_fn")
     check("decorator recorded", e and e.num_calls == 1)
 
+
 _AUTO_FN_CALLED = 0
+
 
 @timeit()
 def _auto_name_fn():
     import time
+
     time.sleep(0.001)
+
 
 def test_timeit_auto_name():
     global _AUTO_FN_CALLED
@@ -79,6 +104,7 @@ def test_timeit_auto_name():
     _auto_name_fn()
     e = _GLOBAL_PROFILER.get("_auto_name_fn")
     check("auto name", e is not None and e.num_calls == 1)
+
 
 def test_profiler_print_summary():
     p = Profiler()
@@ -90,6 +116,7 @@ def test_profiler_print_summary():
     except Exception:
         check("print does not crash", False)
 
+
 def test_profiler_to_json():
     p = Profiler()
     p.record("x", 0.5)
@@ -99,11 +126,13 @@ def test_profiler_to_json():
     check("json has entry", len(data["profiler"]) == 1)
     check("json entry name", data["profiler"][0]["name"] == "x")
 
+
 def test_profiler_save_json():
     import tempfile
+
     p = Profiler()
     p.record("test", 0.123)
-    with tempfile.NamedTemporaryFile(suffix='.json', mode='w', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
         path = f.name
     try:
         p.save_json(path)
@@ -112,6 +141,7 @@ def test_profiler_save_json():
         check("saved json parses", "profiler" in data)
     finally:
         os.unlink(path)
+
 
 def test_memory_tracker():
     mt = MemoryTracker()
@@ -122,6 +152,7 @@ def test_memory_tracker():
     check("peak stays 10", abs(mt.peak_mb - 10.0) < 0.1)
     mt.reset()
     check("reset", mt.peak_mb == 0.0)
+
 
 def test_train_profiler():
     tp = TrainProfiler()
@@ -137,7 +168,7 @@ def test_train_profiler():
         check("summary does not crash", False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_profiler_record()
     test_profiler_disabled()
     test_profiler_reset()
@@ -151,4 +182,6 @@ if __name__ == '__main__':
     test_memory_tracker()
     test_train_profiler()
 
-    print(f"\n{'All profiler tests passed!' if not failed else f'{len(failed)} failures: {failed}'}")
+    print(
+        f"\n{'All profiler tests passed!' if not failed else f'{len(failed)} failures: {failed}'}"
+    )

@@ -1,7 +1,15 @@
 """Tests for optim.py — pure Python optimizers."""
 
 import numpy as np
-from SneppX_ALG.interface_bindings import Tensor, Linear, SGD, AdamW, Lion, LAMB, CosineAnnealingLR
+from SneppX_ALG.interface_bindings import (
+    Tensor,
+    Linear,
+    SGD,
+    AdamW,
+    Lion,
+    LAMB,
+    CosineAnnealingLR,
+)
 
 
 def test_sgd_step():

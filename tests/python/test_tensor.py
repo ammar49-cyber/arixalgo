@@ -216,7 +216,7 @@ def test_broadcasting():
     print("  test_broadcasting PASS")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_create()
     test_list_construction()
     test_scalar_construction()
