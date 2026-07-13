@@ -3,6 +3,14 @@
 #include <string.h>
 #include <stdio.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+    #define FSEEK64(fp, offset, origin) _fseeki64(fp, offset, origin)
+    #define OFF64_T __int64
+#else
+    #define FSEEK64(fp, offset, origin) fseeko64(fp, offset, origin)
+    #define OFF64_T off64_t
+#endif
+
 typedef struct {
     FILE* fp;
     SNEPPXCheckpointHeader header;
@@ -21,9 +29,18 @@ int SNEPPX_ckpt_write_open(const char* path, SNEPPXCheckpointHeader* header, voi
     h->header.magic_lo = SNEPPX_CKPT_MAGIC;
     h->header.magic_hi = SNEPPX_CKPT_MAGIC_HI;
     h->header.version = SNEPPX_CKPT_VERSION;
+    
+    // Write header
     fwrite(&h->header, sizeof(SNEPPXCheckpointHeader), 1, fp);
-    h->records = (SNEPPXTensorRecord*)calloc(header->num_tensors, sizeof(SNEPPXTensorRecord));
-    h->num_records = header->num_tensors;
+    
+    // Write placeholder records (will be filled in write_tensor)
+    if (header->num_tensors > 0) {
+        h->records = (SNEPPXTensorRecord*)calloc(header->num_tensors, sizeof(SNEPPXTensorRecord));
+        if (!h->records) { fclose(fp); return -1; }
+        h->num_records = header->num_tensors;
+        // Write placeholder records
+        fwrite(h->records, sizeof(SNEPPXTensorRecord), header->num_tensors, fp);
+    }
     *handle = h;
     return 0;
 }
@@ -33,10 +50,24 @@ int SNEPPX_ckpt_write_tensor(void* handle, const void* tensor_data, const SNEPPX
     SNEPPXCkptHandle* h = (SNEPPXCkptHandle*)handle;
     if (h->num_records == 0) return -1;
     uint32_t idx = h->header.num_tensors - h->num_records;
-    memcpy(&h->records[idx], record, sizeof(SNEPPXTensorRecord));
-    long pos = ftell(h->fp);
-    h->records[idx].data_offset = (uint64_t)pos;
+    
+    // Get current file position (this is where tensor data will be written)
+    FSEEK64(h->fp, 0, SEEK_END);
+    OFF64_T data_offset = ftell(h->fp);
+    
+    // Update the record in memory with the data offset
+    h->records[idx] = *record;
+    h->records[idx].data_offset = (uint64_t)data_offset;
+    
+    // Update the record in the file (seek to record position in the records array)
+    uint64_t record_pos = sizeof(SNEPPXCheckpointHeader) + idx * sizeof(SNEPPXTensorRecord);
+    FSEEK64(h->fp, (OFF64_T)record_pos, SEEK_SET);
+    fwrite(&h->records[idx], sizeof(SNEPPXTensorRecord), 1, h->fp);
+    
+    // Seek back to end and write tensor data
+    FSEEK64(h->fp, 0, SEEK_END);
     fwrite(tensor_data, 1, record->data_size, h->fp);
+    
     h->num_records--;
     return 0;
 }
@@ -44,23 +75,26 @@ int SNEPPX_ckpt_write_tensor(void* handle, const void* tensor_data, const SNEPPX
 int SNEPPX_ckpt_write_metadata(void* handle, const char* metadata_json, size_t json_len) {
     if (!handle || !metadata_json) return -1;
     SNEPPXCkptHandle* h = (SNEPPXCkptHandle*)handle;
-    long meta_pos = ftell(h->fp);
-    h->header.metadata_offset = (uint64_t)meta_pos;
+    FSEEK64(h->fp, 0, SEEK_END);
+    h->header.metadata_offset = (uint64_t)ftell(h->fp);
     h->header.metadata_size = (uint64_t)json_len;
     fwrite(metadata_json, 1, json_len, h->fp);
-    long end_pos = ftell(h->fp);
-    h->header.total_size = (uint64_t)end_pos;
-    fseek(h->fp, 0, SEEK_SET);
-    fwrite(&h->header, sizeof(SNEPPXCheckpointHeader), 1, h->fp);
-    uint64_t records_offset = sizeof(SNEPPXCheckpointHeader);
-    fseek(h->fp, (long)records_offset, SEEK_SET);
-    fwrite(h->records, sizeof(SNEPPXTensorRecord), h->header.num_tensors, h->fp);
     return 0;
 }
 
 int SNEPPX_ckpt_write_close(void* handle) {
     if (!handle) return -1;
     SNEPPXCkptHandle* h = (SNEPPXCkptHandle*)handle;
+    
+    // Update header with final total_size
+    FSEEK64(h->fp, 0, SEEK_END);
+    long end_pos = ftell(h->fp);
+    h->header.total_size = (uint64_t)end_pos;
+    
+    // Write final header
+    FSEEK64(h->fp, 0, SEEK_SET);
+    fwrite(&h->header, sizeof(SNEPPXCheckpointHeader), 1, h->fp);
+    
     fclose(h->fp);
     free(h->records);
     free(h);
@@ -98,7 +132,7 @@ int SNEPPX_ckpt_read_tensor(void* handle, size_t tensor_idx, void* tensor_data, 
     SNEPPXCkptHandle* h = (SNEPPXCkptHandle*)handle;
     if (tensor_idx >= h->header.num_tensors) return -1;
     if (record) memcpy(record, &h->records[tensor_idx], sizeof(SNEPPXTensorRecord));
-    fseeko64(h->fp, (off64_t)h->records[tensor_idx].data_offset, SEEK_SET);
+    FSEEK64(h->fp, (OFF64_T)h->records[tensor_idx].data_offset, SEEK_SET);
     size_t nread = fread(tensor_data, 1, h->records[tensor_idx].data_size, h->fp);
     if (nread != h->records[tensor_idx].data_size) return -1;
     return 0;
@@ -110,7 +144,7 @@ int SNEPPX_ckpt_read_metadata(void* handle, char** metadata_json, size_t* json_l
     if (h->header.metadata_size == 0) { *metadata_json = NULL; *json_len = 0; return 0; }
     *metadata_json = (char*)malloc(h->header.metadata_size + 1);
     if (!*metadata_json) return -1;
-    fseeko64(h->fp, (off64_t)h->header.metadata_offset, SEEK_SET);
+    FSEEK64(h->fp, (OFF64_T)h->header.metadata_offset, SEEK_SET);
     size_t nread = fread(*metadata_json, 1, h->header.metadata_size, h->fp);
     if (nread != h->header.metadata_size) { free(*metadata_json); *metadata_json = NULL; return -1; }
     (*metadata_json)[h->header.metadata_size] = '\0';

@@ -40,10 +40,14 @@ static void dilithium_ntt(int32_t a[256]) {
             int32_t zeta = dilithium_zetas[++k];
             for (int j = start; j < start + len; j++) {
                 int32_t t = dilithium_mont_reduce((int64_t)zeta * a[j + len]);
-                a[j + len] = a[j] - t;
-                a[j] = a[j] + t;
-                if (a[j] >= DILITHIUM_Q) a[j] -= DILITHIUM_Q;
-                if (a[j + len] >= DILITHIUM_Q) a[j + len] -= DILITHIUM_Q;
+                int32_t u = a[j];
+                int32_t v = t;
+                int32_t sum = u + v;
+                if (sum >= DILITHIUM_Q) sum -= DILITHIUM_Q;
+                a[j] = sum;
+                int32_t diff = u - v;
+                if (diff < 0) diff += DILITHIUM_Q;
+                a[j + len] = diff;
             }
             start += len * 2;
         }
@@ -59,13 +63,14 @@ static void dilithium_inv_ntt(int32_t a[256]) {
             int32_t zeta = -dilithium_zetas[--k];
             if (zeta < 0) zeta += DILITHIUM_Q;
             for (int j = start; j < start + len; j++) {
-                int32_t t = a[j + len];
-                a[j + len] = dilithium_reduce(a[j] - t);
-                if (a[j + len] < 0) a[j + len] += DILITHIUM_Q;
-                a[j] = dilithium_reduce(a[j] + t);
-                if (a[j] < 0) a[j] += DILITHIUM_Q;
-                int32_t tmp = dilithium_mont_reduce((int64_t)zeta * a[j + len]);
-                a[j + len] = tmp;
+                int32_t u = a[j];
+                int32_t v = a[j + len];
+                int32_t sum = u + v;
+                if (sum >= DILITHIUM_Q) sum -= DILITHIUM_Q;
+                int32_t diff = u - v;
+                if (diff < 0) diff += DILITHIUM_Q;
+                a[j] = sum;
+                a[j + len] = dilithium_mont_reduce((int64_t)zeta * diff);
             }
             start += len * 2;
         }
@@ -90,10 +95,6 @@ static void dilithium_poly_mul(int32_t r[256], const int32_t a[256], const int32
     for (int i = 0; i < 256; i++) ta[i] = dilithium_mont_reduce((int64_t)ta[i] * tb[i]);
     dilithium_inv_ntt(ta);
     memcpy(r, ta, sizeof(ta));
-}
-
-static void dilithium_poly_mul_by_const(int32_t r[256], const int32_t a[256], int32_t c) {
-    for (int i = 0; i < 256; i++) r[i] = (int32_t)(((int64_t)a[i] * c) % DILITHIUM_Q);
 }
 
 static void dilithium_poly_tobytes(uint8_t *out, const int32_t a[256]) {
@@ -127,8 +128,8 @@ static int dilithium_poly_frombytes(int32_t r[256], const uint8_t *in) {
 }
 
 static void pack_10bit(uint8_t *out, const int32_t in[256]) {
-    uint16_t buf[4];
     for (int i = 0; i < 64; i++) {
+        uint16_t buf[4];
         for (int j = 0; j < 4; j++) buf[j] = (uint16_t)(in[4*i + j] & 0x3FF);
         uint64_t v = 0;
         for (int j = 0; j < 4; j++) v |= (uint64_t)buf[j] << (10 * j);
@@ -194,7 +195,6 @@ static void unpack_13bit_signed(int32_t out[256], const uint8_t *in) {
 static void pack_z(uint8_t *out, const int32_t in[256], int gamma1) {
     int bound = 2 * gamma1;
     int bits = 0;
-    bits = 0;
     while ((1 << bits) < bound) bits++;
     uint64_t buf = 0;
     int bitpos = 0, pos = 0;
@@ -267,15 +267,15 @@ static void dilithium_poly_use_hint(int32_t r[256], const int32_t a[256], const 
         if (h[i]) {
             int32_t a1 = (a[i] + half_alpha) / alpha;
             if (a1 >= 22) a1 -= 43;
-            int32_t r0v = a[i] - a1 * alpha;
-            int32_t r1v;
-            if (r0v > 0) r1v = (a1 == 21) ? 0 : a1 + 1;
-            else r1v = (a1 == 0) ? 21 : a1 - 1;
-            r[i] = r1v;
+            int32_t r0 = a[i] - a1 * alpha;
+            int32_t r1;
+            if (r0 > 0) r1 = (a1 == 21) ? 0 : a1 + 1;
+            else r1 = (a1 == 0) ? 21 : a1 - 1;
+            r[i] = r1 << 13;
         } else {
             int32_t a1 = (a[i] + half_alpha) / alpha;
             if (a1 >= 22) a1 -= 43;
-            r[i] = a1;
+            r[i] = a1 << 13;
         }
     }
 }
@@ -397,7 +397,6 @@ int SNEPPX_dilithium_keygen(uint8_t *pk, uint8_t *sk, int variant) {
     sk_pos += k * 96;
     for (int i = 0; i < k; i++) pack_13bit_signed(sk + sk_pos + i * 416, t0 + i * 256);
     sk_pos += k * 416;
-
     free(a); free(s1); free(s2); free(t); free(t1); free(t0);
     return 0;
 }
@@ -442,7 +441,7 @@ int SNEPPX_dilithium_sign(uint8_t *sig, size_t *siglen, const uint8_t *m, size_t
     uint8_t c_seed[32];
     int32_t c_poly[256];
     int reject;
-    int max_attempts = 100;
+    int max_attempts = 1000;
     for (int attempt = 0; attempt < max_attempts; attempt++) {
         for (int i = 0; i < k; i++) {
             for (int j = 0; j < 256; j++) {
@@ -457,15 +456,15 @@ int SNEPPX_dilithium_sign(uint8_t *sig, size_t *siglen, const uint8_t *m, size_t
         memset(w0, 0, k * 256 * sizeof(int32_t));
         for (int i = 0; i < k; i++)
             dilithium_poly_decompose(w1 + i * 256, w0 + i * 256, w + i * 256, alpha);
-        {
-            uint8_t *w1_enc = (uint8_t*)calloc((size_t)k * 416, 1);
-        if (!w1_enc) { reject = 1; continue; }
-            for (int i = 0; i < k; i++) dilithium_poly_tobytes(w1_enc + i * 416, w1 + i * 256);
+        uint8_t *w1_enc = (uint8_t*)calloc((size_t)k * 832, 1);
+        if (!w1_enc) { reject = 1; }
+        else {
+            for (int i = 0; i < k; i++) dilithium_poly_tobytes(w1_enc + i * 832, w1 + i * 256);
             uint8_t hash_buf[64];
             SNEPPXSHA512Context ctx;
             SNEPPX_sha512_init(&ctx);
             SNEPPX_sha512_update(&ctx, m, mlen);
-            SNEPPX_sha512_update(&ctx, w1_enc, (size_t)k * 416);
+            SNEPPX_sha512_update(&ctx, w1_enc, (size_t)k * 832);
             SNEPPX_sha512_finish(&ctx, hash_buf);
             memcpy(c_seed, hash_buf, 32);
             free(w1_enc);
@@ -609,14 +608,14 @@ int SNEPPX_dilithium_verify(const uint8_t *sig, size_t siglen, const uint8_t *m,
         }
         dilithium_poly_use_hint(w1 + i * 256, diff, h + i * 256, alpha);
     }
-    uint8_t *w1_enc = (uint8_t*)calloc((size_t)k * 416, 1);
+    uint8_t *w1_enc = (uint8_t*)calloc((size_t)k * 832, 1);
     if (!w1_enc) { free(a); free(t1); free(zvec); free(h); free(az); free(w1); free(ct1_shifted); return -1; }
-    for (int i = 0; i < k; i++) dilithium_poly_tobytes(w1_enc + i * 416, w1 + i * 256);
+    for (int i = 0; i < k; i++) dilithium_poly_tobytes(w1_enc + i * 832, w1 + i * 256);
     uint8_t hash_buf[64];
     SNEPPXSHA512Context ctx;
     SNEPPX_sha512_init(&ctx);
     SNEPPX_sha512_update(&ctx, m, mlen);
-    SNEPPX_sha512_update(&ctx, w1_enc, (size_t)k * 416);
+    SNEPPX_sha512_update(&ctx, w1_enc, (size_t)k * 832);
     SNEPPX_sha512_finish(&ctx, hash_buf);
     free(w1_enc);
     if (memcmp(c_seed, hash_buf, 32) != 0) {
