@@ -28,7 +28,9 @@ class CheckpointSegment:
 
     def recompute(self) -> Tensor:
         # Re-run the wrapped function on the (detached) saved inputs
-        saved = tuple(Tensor.from_numpy(i.data.copy(), dtype=i.dtype_name) for i in self.inputs)
+        saved = tuple(
+            Tensor.from_numpy(i.data.copy(), dtype=i.dtype_name) for i in self.inputs
+        )
         self.output = self.fn(*saved)
         return self.output
 
@@ -108,8 +110,9 @@ class _CheckpointContext:
         return False
 
 
-def checkpoint_sequential(layers: List[Callable], inputs: Tensor,
-                          segments: int = 1) -> Tensor:
+def checkpoint_sequential(
+    layers: List[Callable], inputs: Tensor, segments: int = 1
+) -> Tensor:
     """Checkpoint a sequential stack of ``layers`` in ``segments`` chunks.
 
     ``layers`` is a list of callables each taking one Tensor and returning
@@ -124,12 +127,15 @@ def checkpoint_sequential(layers: List[Callable], inputs: Tensor,
         if hi <= lo:
             continue
         chunk = layers[lo:hi]
+
         def make_fn(chunk):
             def fn(t):
                 h = t
                 for layer in chunk:
                     h = layer(h)
                 return h
+
             return fn
+
         x = checkpoint(make_fn(chunk), x)
     return x

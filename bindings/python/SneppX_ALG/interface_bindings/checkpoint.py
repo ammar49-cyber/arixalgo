@@ -33,57 +33,86 @@ class TensorRecord:
     strides: tuple = ()
 
 
-CHECKPOINT_HEADER_FMT = '<IIIIQQQ32x'
+CHECKPOINT_HEADER_FMT = "<IIIIQQQ32x"
 CHECKPOINT_HEADER_SIZE = struct.calcsize(CHECKPOINT_HEADER_FMT)
-TENSOR_RECORD_FMT = '<8QIIQQ8Q'
+TENSOR_RECORD_FMT = "<8QIIQQ8Q"
 TENSOR_RECORD_SIZE = struct.calcsize(TENSOR_RECORD_FMT)  # 152 bytes
 
 
 def _pack_header(h: CheckpointHeader) -> bytes:
-    return struct.pack(CHECKPOINT_HEADER_FMT,
-                       h.magic_lo, h.magic_hi, h.version, h.num_tensors,
-                       h.metadata_offset, h.metadata_size, h.total_size)
+    return struct.pack(
+        CHECKPOINT_HEADER_FMT,
+        h.magic_lo,
+        h.magic_hi,
+        h.version,
+        h.num_tensors,
+        h.metadata_offset,
+        h.metadata_size,
+        h.total_size,
+    )
 
 
 def _unpack_header(data: bytes) -> CheckpointHeader:
     vals = struct.unpack(CHECKPOINT_HEADER_FMT, data)
     return CheckpointHeader(
-        magic_lo=vals[0], magic_hi=vals[1], version=vals[2],
-        num_tensors=vals[3], metadata_offset=vals[4],
-        metadata_size=vals[5], total_size=vals[6])
+        magic_lo=vals[0],
+        magic_hi=vals[1],
+        version=vals[2],
+        num_tensors=vals[3],
+        metadata_offset=vals[4],
+        metadata_size=vals[5],
+        total_size=vals[6],
+    )
 
 
 def _pack_tensor_record(r: TensorRecord) -> bytes:
     shape_padded = [int(v) for v in r.shape] + [0] * (8 - len(r.shape))
     stride_padded = [int(v) for v in r.strides] + [0] * (8 - len(r.strides))
-    return struct.pack(TENSOR_RECORD_FMT,
-                       *shape_padded, r.ndim, r.dtype,
-                       r.data_offset, r.data_size, *stride_padded)
+    return struct.pack(
+        TENSOR_RECORD_FMT,
+        *shape_padded,
+        r.ndim,
+        r.dtype,
+        r.data_offset,
+        r.data_size,
+        *stride_padded,
+    )
 
 
 def _unpack_tensor_record(data: bytes, offset: int = 0) -> TensorRecord:
-    vals = struct.unpack(TENSOR_RECORD_FMT, data[offset:offset + TENSOR_RECORD_SIZE])
+    vals = struct.unpack(TENSOR_RECORD_FMT, data[offset : offset + TENSOR_RECORD_SIZE])
     shape = tuple(v for v in vals[:8] if v != 0)
     strides = tuple(v for v in vals[12:] if v != 0)
-    return TensorRecord(shape=shape, ndim=vals[8], dtype=vals[9],
-                        data_offset=vals[10], data_size=vals[11],
-                        strides=strides)
+    return TensorRecord(
+        shape=shape,
+        ndim=vals[8],
+        dtype=vals[9],
+        data_offset=vals[10],
+        data_size=vals[11],
+        strides=strides,
+    )
 
 
 class CheckpointWriter:
     def __init__(self, path: str):
         self.path = path
-        self.file = open(path, 'wb')
+        self.file = open(path, "wb")
         self.header = CheckpointHeader()
         self.records: List[TensorRecord] = []
         self._data_parts: List[bytes] = []
         self._meta = {}
 
-    def write_tensor(self, data: bytes, shape: tuple = (),
-                     dtype: int = 0, strides: tuple = ()):
-        rec = TensorRecord(shape=shape, ndim=len(shape), dtype=dtype,
-                           data_offset=0, data_size=len(data),
-                           strides=strides)
+    def write_tensor(
+        self, data: bytes, shape: tuple = (), dtype: int = 0, strides: tuple = ()
+    ):
+        rec = TensorRecord(
+            shape=shape,
+            ndim=len(shape),
+            dtype=dtype,
+            data_offset=0,
+            data_size=len(data),
+            strides=strides,
+        )
         self.records.append(rec)
         self._data_parts.append(data)
 
@@ -114,7 +143,7 @@ class CheckpointWriter:
             self.file.write(part)
 
         # Write metadata
-        meta_data = json.dumps(self._meta).encode('utf-8') if self._meta else b''
+        meta_data = json.dumps(self._meta).encode("utf-8") if self._meta else b""
         meta_offset = self.file.tell()
         self.header.metadata_offset = meta_offset
         self.header.metadata_size = len(meta_data)
@@ -133,10 +162,13 @@ class CheckpointWriter:
 class CheckpointReader:
     def __init__(self, path: str):
         self.path = path
-        self.file = open(path, 'rb')
+        self.file = open(path, "rb")
         header_data = self.file.read(CHECKPOINT_HEADER_SIZE)
         self.header = _unpack_header(header_data)
-        if self.header.magic_lo != SNEPPX_CKPT_MAGIC or self.header.magic_hi != SNEPPX_CKPT_MAGIC_HI:
+        if (
+            self.header.magic_lo != SNEPPX_CKPT_MAGIC
+            or self.header.magic_hi != SNEPPX_CKPT_MAGIC_HI
+        ):
             raise ValueError(f"Invalid checkpoint magic at {path}")
         if self.header.version > SNEPPX_CKPT_VERSION:
             raise ValueError(f"Unsupported version {self.header.version}")
@@ -158,7 +190,7 @@ class CheckpointReader:
             return {}
         self.file.seek(self.header.metadata_offset)
         data = self.file.read(self.header.metadata_size)
-        return json.loads(data.decode('utf-8'))
+        return json.loads(data.decode("utf-8"))
 
     def close(self):
         self.file.close()
@@ -174,9 +206,15 @@ def validate_checkpoint(path: str) -> bool:
 
 
 class CheckpointCoordinator:
-    def __init__(self, checkpoint_dir: str, world_size: int = 1, rank: int = 0,
-                 save_interval: int = 100, keep_last: int = 5,
-                 async_save: bool = True):
+    def __init__(
+        self,
+        checkpoint_dir: str,
+        world_size: int = 1,
+        rank: int = 0,
+        save_interval: int = 100,
+        keep_last: int = 5,
+        async_save: bool = True,
+    ):
         self.checkpoint_dir = checkpoint_dir
         self.world_size = world_size
         self.rank = rank
@@ -190,8 +228,9 @@ class CheckpointCoordinator:
         os.makedirs(checkpoint_dir, exist_ok=True)
 
     def _build_path(self, step: int) -> str:
-        return os.path.join(self.checkpoint_dir,
-                            f"checkpoint_{step}_rank_{self.rank}.sneppx")
+        return os.path.join(
+            self.checkpoint_dir, f"checkpoint_{step}_rank_{self.rank}.sneppx"
+        )
 
     def _do_async_save(self, path: str, state: bytes, step: int, meta: dict):
         w = CheckpointWriter(path)
@@ -201,8 +240,13 @@ class CheckpointCoordinator:
         if self.rank == 0:
             print(f"[SNEPPX Checkpoint] Saved to {path} (step {step})")
 
-    def save(self, state: bytes, step: int, metadata: Optional[dict] = None,
-             barrier_fn: Optional[Callable] = None):
+    def save(
+        self,
+        state: bytes,
+        step: int,
+        metadata: Optional[dict] = None,
+        barrier_fn: Optional[Callable] = None,
+    ):
         if step % self.save_interval != 0:
             return
         self.current_step = step
@@ -215,7 +259,8 @@ class CheckpointCoordinator:
 
         if self.async_save:
             self._save_thread = threading.Thread(
-                target=self._do_async_save, args=(path, state, step, meta))
+                target=self._do_async_save, args=(path, state, step, meta)
+            )
             self._save_thread.start()
         else:
             self._do_async_save(path, state, step, meta)
@@ -226,11 +271,16 @@ class CheckpointCoordinator:
     def _cleanup_old(self):
         import glob
         import re
-        pattern = os.path.join(self.checkpoint_dir, f"checkpoint_*_rank_{self.rank}.sneppx")
+
+        pattern = os.path.join(
+            self.checkpoint_dir, f"checkpoint_*_rank_{self.rank}.sneppx"
+        )
         files = glob.glob(pattern)
+
         def _step_from_path(p):
-            m = re.search(r'checkpoint_(\d+)_rank_', os.path.basename(p))
+            m = re.search(r"checkpoint_(\d+)_rank_", os.path.basename(p))
             return int(m.group(1)) if m else 0
+
         files = sorted(files, key=_step_from_path)
         while len(files) > self.keep_last:
             os.remove(files.pop(0))
@@ -248,9 +298,13 @@ class CheckpointCoordinator:
             print(f"[SNEPPX Checkpoint] Loaded from {path} (step {self.current_step})")
         return data, meta
 
-    def coordinated_save(self, state: bytes, step: int,
-                         metadata: Optional[dict] = None,
-                         barrier_fn: Optional[Callable] = None):
+    def coordinated_save(
+        self,
+        state: bytes,
+        step: int,
+        metadata: Optional[dict] = None,
+        barrier_fn: Optional[Callable] = None,
+    ):
         if barrier_fn:
             barrier_fn()
         self.save(state, step, metadata)
@@ -272,8 +326,13 @@ class HeartbeatStatus:
 
 
 class HeartbeatMonitor:
-    def __init__(self, world_size: int, rank: int,
-                 interval_ms: int = 1000, timeout_ms: int = 5000):
+    def __init__(
+        self,
+        world_size: int,
+        rank: int,
+        interval_ms: int = 1000,
+        timeout_ms: int = 5000,
+    ):
         self.world_size = world_size
         self.rank = rank
         self.interval_ms = interval_ms
@@ -328,8 +387,11 @@ class HeartbeatMonitor:
 
     def get_alive_ranks(self) -> List[int]:
         with self._lock:
-            return [i for i in range(self.world_size)
-                    if self._status[i] == HeartbeatStatus.ALIVE]
+            return [
+                i
+                for i in range(self.world_size)
+                if self._status[i] == HeartbeatStatus.ALIVE
+            ]
 
     def get_status(self) -> List[int]:
         with self._lock:
@@ -337,8 +399,7 @@ class HeartbeatMonitor:
 
 
 class ElasticTrainer:
-    def __init__(self, world_size: int, rank: int,
-                 max_restarts: int = 3):
+    def __init__(self, world_size: int, rank: int, max_restarts: int = 3):
         self.world_size = world_size
         self.rank = rank
         self.max_restarts = max_restarts
@@ -365,7 +426,9 @@ class ElasticTrainer:
             raise RuntimeError(f"This rank ({self.rank}) is leaving")
         alive = sum(self._alive_ranks)
         if alive < self.world_size // 2:
-            raise RuntimeError(f"Less than half ranks alive ({alive}/{self.world_size})")
+            raise RuntimeError(
+                f"Less than half ranks alive ({alive}/{self.world_size})"
+            )
 
     def handle_failure(self, failed_rank: int):
         self._alive_ranks[failed_rank] = False
@@ -378,8 +441,10 @@ class ElasticTrainer:
             self.checkpoint_restore_fn(restore_ver)
 
         self.version += 1
-        print(f"[SNEPPX Elastic] Rank {self.rank}: recovery attempt "
-              f"{self.restart_count}/{self.max_restarts}, topology v{self.version}")
+        print(
+            f"[SNEPPX Elastic] Rank {self.rank}: recovery attempt "
+            f"{self.restart_count}/{self.max_restarts}, topology v{self.version}"
+        )
 
     def reconfigure(self) -> int:
         if self.barrier_fn:
@@ -387,7 +452,9 @@ class ElasticTrainer:
         if self.checkpoint_restore_fn:
             self.checkpoint_restore_fn(self.version)
         alive = sum(self._alive_ranks)
-        print(f"[SNEPPX Elastic] Reconfig complete: {alive}/{self.world_size} alive (v{self.version})")
+        print(
+            f"[SNEPPX Elastic] Reconfig complete: {alive}/{self.world_size} alive (v{self.version})"
+        )
         return alive
 
     def get_new_topology(self) -> tuple:
@@ -404,12 +471,17 @@ class ElasticTrainer:
 
 
 class FaultToleranceManager:
-    def __init__(self, world_size: int, rank: int,
-                 heartbeat_interval_ms: int = 1000,
-                 timeout_ms: int = 5000,
-                 max_restarts: int = 3):
-        self.heartbeat = HeartbeatMonitor(world_size, rank,
-                                          heartbeat_interval_ms, timeout_ms)
+    def __init__(
+        self,
+        world_size: int,
+        rank: int,
+        heartbeat_interval_ms: int = 1000,
+        timeout_ms: int = 5000,
+        max_restarts: int = 3,
+    ):
+        self.heartbeat = HeartbeatMonitor(
+            world_size, rank, heartbeat_interval_ms, timeout_ms
+        )
         self.elastic = ElasticTrainer(world_size, rank, max_restarts)
         self.world_size = world_size
         self.rank = rank
@@ -428,5 +500,7 @@ class FaultToleranceManager:
         self.elastic.handle_failure(failed_rank)
         new_world, new_rank = self.elastic.get_new_topology()
         self.elastic.reconfigure()
-        print(f"[SNEPPX FT] Recovery: world={new_world} rank={new_rank} "
-              f"(attempt {self.elastic.restart_count}/{self.elastic.max_restarts})")
+        print(
+            f"[SNEPPX FT] Recovery: world={new_world} rank={new_rank} "
+            f"(attempt {self.elastic.restart_count}/{self.elastic.max_restarts})"
+        )

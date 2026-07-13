@@ -12,7 +12,7 @@ class ProfileEntry:
     name: str
     num_calls: int = 0
     total_time_s: float = 0.0
-    min_time_s: float = float('inf')
+    min_time_s: float = float("inf")
     max_time_s: float = 0.0
     avg_time_s: float = 0.0
 
@@ -50,27 +50,36 @@ class Profiler:
             print("(no profiler entries)")
             return
         print(f"\n{'='*70}")
-        print(f"{'Operation':<32} {'Calls':>8} {'Total(s)':>12} {'Avg(s)':>10} {'Min(s)':>10} {'Max(s)':>10}")
+        print(
+            f"{'Operation':<32} {'Calls':>8} {'Total(s)':>12} {'Avg(s)':>10} {'Min(s)':>10} {'Max(s)':>10}"
+        )
         print(f"{'-'*70}")
         for name in sorted(self._entries):
             e = self._entries[name]
-            print(f"{name:<32} {e.num_calls:>8} {e.total_time_s:>12.6f} "
-                  f"{e.avg_time_s:>10.6f} {e.min_time_s:>10.6f} {e.max_time_s:>10.6f}")
+            print(
+                f"{name:<32} {e.num_calls:>8} {e.total_time_s:>12.6f} "
+                f"{e.avg_time_s:>10.6f} {e.min_time_s:>10.6f} {e.max_time_s:>10.6f}"
+            )
         print(f"{'='*70}")
 
     def to_json(self) -> str:
         data = []
         for name in sorted(self._entries):
             e = self._entries[name]
-            data.append({
-                "name": name, "calls": e.num_calls,
-                "total_s": e.total_time_s, "avg_s": e.avg_time_s,
-                "min_s": e.min_time_s, "max_s": e.max_time_s
-            })
+            data.append(
+                {
+                    "name": name,
+                    "calls": e.num_calls,
+                    "total_s": e.total_time_s,
+                    "avg_s": e.avg_time_s,
+                    "min_s": e.min_time_s,
+                    "max_s": e.max_time_s,
+                }
+            )
         return json.dumps({"profiler": data}, indent=2)
 
     def save_json(self, path: str):
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(self.to_json())
 
 
@@ -93,7 +102,9 @@ def timeit(name: Optional[str] = None):
             finally:
                 elapsed = time.perf_counter() - t0
                 _GLOBAL_PROFILER.record(label, elapsed)
+
         return wrapper
+
     return decorator
 
 
@@ -148,6 +159,7 @@ class MemoryTracker:
 
 class TrainProfiler:
     """Aggregates profiling for a training loop."""
+
     def __init__(self):
         self.profiler = Profiler()
         self.memory = MemoryTracker()
@@ -172,7 +184,9 @@ class TrainProfiler:
         print(f"  Total steps:    {len(self._step_times)}")
         print(f"  Total time:     {total:.2f}s")
         if self._step_times:
-            print(f"  Avg step time:  {sum(self._step_times)/len(self._step_times)*1000:.2f}ms")
+            print(
+                f"  Avg step time:  {sum(self._step_times)/len(self._step_times)*1000:.2f}ms"
+            )
             print(f"  Steps/sec:      {self.steps_per_sec():.1f}")
         print(f"  Peak memory:    {self.memory.peak_mb:.1f} MB")
         print(f"{'='*60}")

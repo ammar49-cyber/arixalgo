@@ -12,8 +12,14 @@ class TrainConfig:
             self._c = _neural_engine_bridge.SNEPPXTrainConfig()
             self._c.default()
         else:
-            self._data = {"num_epochs": 10, "batch_size": 32, "learning_rate": 0.001,
-                         "log_interval": 1, "save_interval": 5, "device": 0}
+            self._data = {
+                "num_epochs": 10,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "log_interval": 1,
+                "save_interval": 5,
+                "device": 0,
+            }
 
     @property
     def num_epochs(self):
@@ -98,11 +104,18 @@ class Optimizer:
 
 
 class SGD(Optimizer):
-    def __init__(self, params: List[Tensor], lr: float = 0.01, momentum: float = 0.0,
-                 weight_decay: float = 0.0):
+    def __init__(
+        self,
+        params: List[Tensor],
+        lr: float = 0.01,
+        momentum: float = 0.0,
+        weight_decay: float = 0.0,
+    ):
         super().__init__(params, lr)
         if _HAS_C_BACKEND:
-            self._opt = _neural_engine_bridge._Optimizer.sgd_create(lr, momentum, weight_decay)
+            self._opt = _neural_engine_bridge._Optimizer.sgd_create(
+                lr, momentum, weight_decay
+            )
         else:
             self._opt = None
 
@@ -112,11 +125,19 @@ class SGD(Optimizer):
 
 
 class Adam(Optimizer):
-    def __init__(self, params: List[Tensor], lr: float = 0.001, betas: Tuple[float, float] = (0.9, 0.999),
-                 eps: float = 1e-8, weight_decay: float = 0.0):
+    def __init__(
+        self,
+        params: List[Tensor],
+        lr: float = 0.001,
+        betas: Tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 0.0,
+    ):
         super().__init__(params, lr)
         if _HAS_C_BACKEND:
-            self._opt = _neural_engine_bridge._Optimizer.adam_create(lr, betas[0], betas[1], eps, weight_decay)
+            self._opt = _neural_engine_bridge._Optimizer.adam_create(
+                lr, betas[0], betas[1], eps, weight_decay
+            )
         else:
             self._opt = None
 
@@ -126,11 +147,19 @@ class Adam(Optimizer):
 
 
 class AdamW(Optimizer):
-    def __init__(self, params: List[Tensor], lr: float = 0.001, betas: Tuple[float, float] = (0.9, 0.999),
-                 eps: float = 1e-8, weight_decay: float = 0.01):
+    def __init__(
+        self,
+        params: List[Tensor],
+        lr: float = 0.001,
+        betas: Tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 0.01,
+    ):
         super().__init__(params, lr)
         if _HAS_C_BACKEND:
-            self._opt = _neural_engine_bridge._Optimizer.adamw_create(lr, betas[0], betas[1], eps, weight_decay)
+            self._opt = _neural_engine_bridge._Optimizer.adamw_create(
+                lr, betas[0], betas[1], eps, weight_decay
+            )
         else:
             self._opt = None
 
@@ -151,7 +180,9 @@ class StepLR(LRScheduler):
     def __init__(self, optimizer: Optimizer, step_size: int, gamma: float = 0.1):
         super().__init__(optimizer)
         if _HAS_C_BACKEND:
-            self._sched = _neural_engine_bridge._LRScheduler.step_lr(0.01, gamma, step_size)
+            self._sched = _neural_engine_bridge._LRScheduler.step_lr(
+                0.01, gamma, step_size
+            )
         else:
             self._sched = None
 
@@ -174,11 +205,18 @@ class ExponentialLR(LRScheduler):
 
 
 class CosineLR(LRScheduler):
-    def __init__(self, optimizer: Optimizer, min_lr: float = 0.0, max_lr: float = 0.01,
-                 total_steps: int = 100):
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        min_lr: float = 0.0,
+        max_lr: float = 0.01,
+        total_steps: int = 100,
+    ):
         super().__init__(optimizer)
         if _HAS_C_BACKEND:
-            self._sched = _neural_engine_bridge._LRScheduler.cosine(0.01, min_lr, max_lr, total_steps)
+            self._sched = _neural_engine_bridge._LRScheduler.cosine(
+                0.01, min_lr, max_lr, total_steps
+            )
         else:
             self._sched = None
 
@@ -188,12 +226,19 @@ class CosineLR(LRScheduler):
 
 
 class ReduceLROnPlateau(LRScheduler):
-    def __init__(self, optimizer: Optimizer, factor: float = 0.5, patience: int = 10,
-                 mode: str = 'min'):
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        factor: float = 0.5,
+        patience: int = 10,
+        mode: str = "min",
+    ):
         super().__init__(optimizer)
-        mode_min = 1 if mode == 'min' else 0
+        mode_min = 1 if mode == "min" else 0
         if _HAS_C_BACKEND:
-            self._sched = _neural_engine_bridge._LRScheduler.reduce_on_plateau(0.01, factor, patience, mode_min)
+            self._sched = _neural_engine_bridge._LRScheduler.reduce_on_plateau(
+                0.01, factor, patience, mode_min
+            )
         else:
             self._sched = None
 
@@ -262,23 +307,33 @@ class DataLoader:
 
     def __iter__(self):
         import numpy as np
+
         indices = list(range(len(self.dataset)))
         if self.shuffle:
             np.random.shuffle(indices)
         for start in range(0, len(indices), self.batch_size):
-            batch_indices = indices[start:start + self.batch_size]
+            batch_indices = indices[start : start + self.batch_size]
             item = self.dataset[batch_indices[0]]
             if isinstance(item, tuple):
                 batches = [[] for _ in range(len(item))]
                 for i in batch_indices:
                     elem = self.dataset[i]
                     for j in range(len(elem)):
-                        batches[j].append(elem[j] if isinstance(elem[j], Tensor)
-                                          else Tensor.from_numpy(elem[j]))
+                        batches[j].append(
+                            elem[j]
+                            if isinstance(elem[j], Tensor)
+                            else Tensor.from_numpy(elem[j])
+                        )
                 yield tuple(Tensor.cat(b) if b else Tensor.zeros((0,)) for b in batches)
             else:
-                items = [self.dataset[i] if isinstance(self.dataset[i], Tensor)
-                         else Tensor.from_numpy(self.dataset[i]) for i in batch_indices]
+                items = [
+                    (
+                        self.dataset[i]
+                        if isinstance(self.dataset[i], Tensor)
+                        else Tensor.from_numpy(self.dataset[i])
+                    )
+                    for i in batch_indices
+                ]
                 yield Tensor.cat(items)
 
 
@@ -318,8 +373,12 @@ class Trainer:
         else:
             self._model.load_checkpoint(path)
 
-    def fit(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None,
-            epochs: Optional[int] = None):
+    def fit(
+        self,
+        train_loader: DataLoader,
+        val_loader: Optional[DataLoader] = None,
+        epochs: Optional[int] = None,
+    ):
         if epochs is not None:
             self._config.num_epochs = epochs
         epochs = self._config.num_epochs

@@ -14,7 +14,6 @@ from contextlib import contextmanager
 from .tensor import Tensor, Dtype
 import numpy as np
 
-
 # Module-level autocast state (mirrors torch's thread-local-ish model)
 _AUTOCAST_ENABLED = False
 _AUTOCAST_DTYPE = "float16"
@@ -51,9 +50,14 @@ class GradScaler:
     with an optional growth interval and windowed hysteresis.
     """
 
-    def __init__(self, init_scale: float = 2.0 ** 16, growth_factor: float = 2.0,
-                 backoff_factor: float = 0.5, growth_interval: int = 2000,
-                 enabled: bool = True):
+    def __init__(
+        self,
+        init_scale: float = 2.0**16,
+        growth_factor: float = 2.0,
+        backoff_factor: float = 0.5,
+        growth_interval: int = 2000,
+        enabled: bool = True,
+    ):
         self._init_scale = float(init_scale)
         self._scale = float(init_scale)
         self._growth_factor = float(growth_factor)
