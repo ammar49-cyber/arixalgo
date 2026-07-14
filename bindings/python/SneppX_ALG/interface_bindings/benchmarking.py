@@ -2,12 +2,14 @@
 
 import time
 import numpy as np
-from typing import Dict, List, Any, Callable, Optional, Tuple, Union, List
+from typing import Dict, List, Any, Callable, Optional, Tuple, Union
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
 import csv
 import os
+
+from .tensor import Tensor
 
 try:
     import psutil
@@ -232,7 +234,8 @@ class BenchmarkSuite:
                 (512, 64, 2048),
             ]
 
-        from .advanced_ops import matmul
+        def _matmul(a, b):
+            return a @ b
 
         results = []
         for M, N, K in shapes:
@@ -241,7 +244,7 @@ class BenchmarkSuite:
             mem_mb = (M * K + K * N + M * N) * 4 / (1024 * 1024)
 
             result = self.benchmark(
-                f"matmul_{M}x{N}x{K}", "matmul", lambda: matmul(A, B), memory_mb=mem_mb
+                f"matmul_{M}x{N}x{K}", "matmul", lambda: _matmul(A, B), memory_mb=mem_mb
             )
             results.append(result)
         return results
