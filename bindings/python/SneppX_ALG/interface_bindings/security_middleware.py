@@ -12,6 +12,15 @@ from dataclasses import dataclass, field
 # import time (it falls back to pure Python when the C lib is absent).
 _S5PromptFilter = None
 _S5OutputVerifier = None
+_FirewallRunner = None
+
+
+def _get_firewall_runner():
+    global _FirewallRunner
+    if _FirewallRunner is None:
+        from .firewall import FirewallRunner as _FR
+        _FirewallRunner = _FR
+    return _FirewallRunner
 
 
 def _get_s5_prompt_filter():
@@ -348,15 +357,37 @@ class SecurityMiddleware:
 
         # After generation:
         result = security.verify_output(text)
-    """
-
-    def __init__(self, config: Optional[SecurityConfig] = None):
+"""
         self.config = config or SecurityConfig()
         self.authenticator = Authenticator(self.config.auth)
         self.prompt_filter = PromptFilter(self.config.prompt_filter)
         self.output_verifier = OutputVerifier(self.config.output_verifier)
         self._rate_limiters: Dict[str, _SlidingWindowCounter] = {}
-
+        self._firewall = None
+    
+    @property
+    def firewall(self):
+        if self._firewall is None:
+            fw_cls = _get_firewall_runner()
+            self._firewall = fw_cls()
+        return self._firewall
+    
+    @firewall.setter
+    def firewall(self, value):
+        self._firewall = value
+    
+    def check_firewall(self, client_ip, method="GET", path="/", headers=None, body=None, query="", ssl_object=None, knock_header=""):
+        return self.firewall.check_request(
+            client_ip=client_ip,
+            method=method,
+            path=path,
+            headers=headers or {},
+            body=body,
+            query=query,
+            ssl_object=ssl_object,
+            knock_header=knock_header,
+        )
+    
     def authenticate(self, authorization: Optional[str]) -> Optional[str]:
         """Authenticate request. Returns user id or ``None``."""
         return self.authenticator.authenticate(authorization)
@@ -404,6 +435,12 @@ class SecurityMiddleware:
 
     def prompt_blocked_error(self) -> dict:
         return {"detail": "Prompt blocked by content filter"}
+    
+    def firewall_blocked_error(self, result) -> dict:
+        return {"detail": result.reason, "status_code": result.status_code}
+    
+    def release_concurrent(self, client_ip: str):
+        self.firewall.release_concurrent(client_ip)
 
 
 __all__ = [
