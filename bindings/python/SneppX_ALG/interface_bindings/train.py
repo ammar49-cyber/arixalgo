@@ -94,13 +94,18 @@ class Optimizer:
     def __init__(self, params: List[Tensor], lr: float = 0.01):
         self._params = params
         self._grads = [Tensor.zeros(p.shape) for p in params]
+        self.lr = lr
 
     def zero_grad(self):
         for g in self._grads:
             g.fill_(0.0)
 
     def step(self):
-        pass
+        if _HAS_C_BACKEND:
+            return
+        lr = getattr(self, "lr", 0.01)
+        for p, g in zip(self._params, self._grads):
+            p.data = p.data - lr * g.data
 
 
 class SGD(Optimizer):
