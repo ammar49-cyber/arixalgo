@@ -31,6 +31,7 @@ from .generation import (
 )
 from .tokenizer import Tokenizer
 from .security_middleware import SecurityConfig, SecurityMiddleware
+from .firewall import create_firewall as _create_firewall
 
 logger = logging.getLogger(__name__)
 
@@ -215,12 +216,16 @@ def get_security() -> Optional[SecurityMiddleware]:
     return _security
 
 
-def set_security(config: Optional[SecurityConfig] = None):
+def set_security(config: Optional[SecurityConfig] = None, firewall_config: Optional[dict] = None):
     global _security
     if config is None:
         _security = SecurityMiddleware(SecurityConfig.from_env())
     else:
         _security = SecurityMiddleware(config)
+    if firewall_config is not None:
+        _security.firewall = _create_firewall(**firewall_config)
+    elif os.environ.get("FIREWALL_CONFIG"):
+        _security.firewall = _create_firewall(os.environ["FIREWALL_CONFIG"])
 
 
 @asynccontextmanager
@@ -279,16 +284,29 @@ def _verify_output(text: str) -> Tuple[str, str]:
 @app.middleware("http")
 async def _auth_rate_limit_middleware(request, call_next):
     sec = get_security()
-    if sec is not None and sec.authenticator.enabled:
-        auth_header = request.headers.get("Authorization")
-        user = sec.authenticate(auth_header)
-        if user is None:
+    if sec is not None:
+        fw_result = sec.check_firewall(
+            client_ip=request.client.host if request.client else "",
+            method=request.method,
+            path=request.url.path,
+            headers={k.lower(): v for k, v in request.headers.items()},
+            query=str(request.url.query),
+        )
+        if not fw_result.allowed:
             from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=401, content=sec.auth_required_error())
-        if not sec.check_rate_limit(user)[0]:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=429, content=sec.rate_limit_error("Rate limit exceeded"))
+            return JSONResponse(status_code=fw_result.status_code, content={"detail": fw_result.reason})
+        if sec.authenticator.enabled:
+            auth_header = request.headers.get("Authorization")
+            user = sec.authenticate(auth_header)
+            if user is None:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content=sec.auth_required_error())
+            if not sec.check_rate_limit(user)[0]:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=429, content=sec.rate_limit_error("Rate limit exceeded"))
     response = await call_next(request)
+    if sec is not None and request.client:
+        sec.release_concurrent(request.client.host)
     return response
 
 
@@ -622,4 +640,5 @@ __all__ = [
     "HealthResponse",
     "ModelInfo",
     "ModelListResponse",
+    "create_firewall",
 ]
