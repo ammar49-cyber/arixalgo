@@ -34,10 +34,12 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "numpy>=1.21.0",
+        "pyyaml>=5.1",
     ],
     extras_require={
         "dev": ["pytest>=7.0", "scipy>=1.7"],
         "hf": ["huggingface_hub>=0.16.0"],
+        "serve": ["uvicorn>=0.22.0"],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -51,5 +53,12 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
     keywords="ai, machine-learning, neural-networks, security, post-quantum, cryptography",
+    entry_points={
+        "console_scripts": [
+            "sneppx-train=SneppX_ALG.interface_bindings.train_cli:main",
+            "sneppx-serve=SneppX_ALG.interface_bindings.serve_cli:main",
+            "sneppx-experiment=SneppX_ALG.interface_bindings.experiment_cli:main",
+        ],
+    },
     zip_safe=False,
 )

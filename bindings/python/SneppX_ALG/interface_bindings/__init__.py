@@ -2,6 +2,81 @@ from .. import _neural_engine_bridge
 
 __version__ = "0.9.4.467"
 
+# Phase 1 Foundation — dispatch layer + ctypes utilities
+from . import dispatch
+from .dispatch import (
+    get_backend,
+    get_security_backend,
+    get_algo_backend,
+    get_kernel_backend,
+    get_infra_backend,
+    _HAS_CUDA,
+    _HAS_C,
+)
+from .c_loader import load_library, find_load
+from .c_types import (
+    int8_t,
+    uint8_t,
+    int16_t,
+    uint16_t,
+    int32_t,
+    uint32_t,
+    int64_t,
+    uint64_t,
+    size_t,
+    ssize_t,
+    float_t,
+    double_t,
+    const_char_p,
+    void_p,
+    DataBuffer,
+    make_struct,
+)
+
+# Phase 2 — Crypto bindings
+from .crypto_sign import Ed25519, Dilithium, SphincsPlus
+from .crypto_kem import KyberKEM, X25519
+from .crypto_symmetric import AESGCM, ChaCha20, Poly1305, AEAD
+from .crypto_hash import sha256, sha512, sha3_256, sha3_512, shake_128, shake_256, Blake3, SipHash
+from .crypto_kdf import HMAC as HMAC_, HKDF, PBKDF2, Argon2
+from .crypto_util import BigNum, DRBG, Random, ConstantTime, EntropyPool
+
+# Phase 3 — Security bindings (S1–S9)
+from .secure_memory import (
+    SecureAllocator, StackCanary, ASLR, MemoryHardening, MemoryLeakDetector,
+)
+from .s4_network import DDoSMitigation, IdentityManager, TransportSecurity
+from .runtime_monitor import IntegrityMonitor, ContainerBreakoutDetector, AdvancedMonitor
+from .key_vault import KeyVault, AuditLogger
+from .secure_updates import SignedUpdate, ContainerSecurity
+from .formal_verify import LTLProperty, ModelChecker, StateGraph
+from .pen_testing import NetworkFuzzer, SelfAuditor
+from .obfuscation_bridge import (
+    ObfuscationConfig, CfgFlattening, InstructionSubstitution,
+    OpaquePredicate, StringEncryption, ObfuscationPipeline,
+)
+from .ai_safety_ext import RLHFSafety, DataPoisoningDefense
+from .ai_safety_ext import PromptFilter as AIPromptFilter
+from .ai_safety_ext import OutputVerifier as AIOutputVerifier
+
+# Phase 4 — Algorithm bindings (ARC/FM/HSS/NPE/SER)
+from .algo_arc import ARCAttackSim, ARCFForward, ARCGradientObfuscator, ARCInputGuard, ARCOutputVerifier
+from .algo_fm import FMController, FMMemoryBank, FMNode, FMSync
+from .algo_hss import HSSDiscretize, HSSScan, HSSStep
+from .algo_hss import HSSModel as AlgoHSSModel
+from .algo_npe import NPEInstruction, NPEProgram, NPECompiler, NPEVM, NPEVerify
+from .algo_ser import SERExpert, SERRoute, SERLayer, SERLoss
+from .algo_ser import SERModel as AlgoSERModel
+
+# Phase 5 — Kernel bindings
+from .c_attention import Attention, DifferentialAttention, FlexAttention
+from .c_arch import ArchOps, Mamba2
+from .c_memory import MemoryAllocator, MemoryPool
+from .c_thread import ThreadPool, WorkStealingPool
+from .c_tensor_expr import TensorExpr, TensorExprCompiler
+from .c_simd_gemm import SimdGemm, GemmConfig
+from .c_logger import Logger
+
 from .tensor import (
     Tensor,
     Dtype,
@@ -446,6 +521,42 @@ from .profiler import (
     timeit,
     get_profiler,
     _GLOBAL_PROFILER,
+)
+
+# Phase 6 — Infrastructure bindings (net + drivers)
+from .net_bindings import (
+    Topology,
+    TopologyType,
+    SocketComm,
+    RDMA,
+    GRPCService,
+    NCCLComm,
+    ProcessGroup,
+)
+from .driver_bindings import (
+    CUDADriver,
+    CUDADeviceProps,
+    ROCmDriver,
+    TPUDriver,
+)
+
+# Phase 7 — ASM integration
+from .asm_bridge import (
+    CPUFeatures,
+    AsmLibrary,
+    AsmFunction,
+    ConstantTime as AsmConstantTime,
+    SecureMemory as AsmSecureMemory,
+)
+from .crypto_asm import (
+    AESNI,
+    SHANI,
+    ChaCha20AVX2,
+    Poly1305ASM,
+    MontgomeryMul,
+    Ed25519ASM,
+    ConstantTimeOps,
+    FirewallASM,
 )
 from .data_loader import (
     Dataset,
@@ -1020,4 +1131,154 @@ __all__ = [
     "CppTensorDataset",
     "DataLoader",
     "_neural_engine_bridge",
+    # Phase 1 Foundation — dispatch layer
+    "get_backend",
+    "get_security_backend",
+    "get_algo_backend",
+    "get_kernel_backend",
+    "get_infra_backend",
+    "_HAS_CUDA",
+    "_HAS_C",
+    "load_library",
+    "find_load",
+    "int8_t",
+    "uint8_t",
+    "int16_t",
+    "uint16_t",
+    "int32_t",
+    "uint32_t",
+    "int64_t",
+    "uint64_t",
+    "size_t",
+    "ssize_t",
+    "float_t",
+    "double_t",
+    "const_char_p",
+    "void_p",
+    "DataBuffer",
+    "make_struct",
+    "dispatch",
+    # Phase 2 — Crypto bindings
+    "Ed25519",
+    "Dilithium",
+    "SphincsPlus",
+    "KyberKEM",
+    "X25519",
+    "AESGCM",
+    "ChaCha20",
+    "Poly1305",
+    "AEAD",
+    "sha256",
+    "sha512",
+    "sha3_256",
+    "sha3_512",
+    "shake_128",
+    "shake_256",
+    "Blake3",
+    "SipHash",
+    "HMAC_",
+    "HKDF",
+    "PBKDF2",
+    "Argon2",
+    "BigNum",
+    "DRBG",
+    "Random",
+    "ConstantTime",
+    "EntropyPool",
+    # Phase 3 — Security bindings (S1–S9)
+    "SecureAllocator",
+    "StackCanary",
+    "ASLR",
+    "MemoryHardening",
+    "MemoryLeakDetector",
+    "DDoSMitigation",
+    "IdentityManager",
+    "TransportSecurity",
+    "IntegrityMonitor",
+    "ContainerBreakoutDetector",
+    "AdvancedMonitor",
+    "KeyVault",
+    "AuditLogger",
+    "SignedUpdate",
+    "ContainerSecurity",
+    "LTLProperty",
+    "ModelChecker",
+    "StateGraph",
+    "NetworkFuzzer",
+    "SelfAuditor",
+    "ObfuscationConfig",
+    "CfgFlattening",
+    "InstructionSubstitution",
+    "OpaquePredicate",
+    "StringEncryption",
+    "ObfuscationPipeline",
+    "RLHFSafety",
+    "AIPromptFilter",
+    "AIOutputVerifier",
+    "DataPoisoningDefense",
+    # Phase 4 — Algorithm bindings
+    "ARCAttackSim",
+    "ARCFForward",
+    "ARCGradientObfuscator",
+    "ARCInputGuard",
+    "ARCOutputVerifier",
+    "FMController",
+    "FMMemoryBank",
+    "FMNode",
+    "FMSync",
+    "HSSDiscretize",
+    "HSSScan",
+    "AlgoHSSModel",
+    "HSSStep",
+    "NPEInstruction",
+    "NPEProgram",
+    "NPECompiler",
+    "NPEVM",
+    "NPEVerify",
+    "SERExpert",
+    "SERRoute",
+    "SERLayer",
+    "SERLoss",
+    "AlgoSERModel",
+    # Phase 5 — Kernel bindings
+    "Attention",
+    "DifferentialAttention",
+    "FlexAttention",
+    "ArchOps",
+    "Mamba2",
+    "MemoryAllocator",
+    "MemoryPool",
+    "ThreadPool",
+    "WorkStealingPool",
+    "TensorExpr",
+    "TensorExprCompiler",
+    "SimdGemm",
+    "GemmConfig",
+    "Logger",
+    # Phase 6 — Infrastructure bindings
+    "Topology",
+    "TopologyType",
+    "SocketComm",
+    "RDMA",
+    "GRPCService",
+    "NCCLComm",
+    "ProcessGroup",
+    "CUDADriver",
+    "CUDADeviceProps",
+    "ROCmDriver",
+    "TPUDriver",
+    # Phase 7 — ASM integration
+    "CPUFeatures",
+    "AsmLibrary",
+    "AsmFunction",
+    "AsmConstantTime",
+    "AsmSecureMemory",
+    "AESNI",
+    "SHANI",
+    "ChaCha20AVX2",
+    "Poly1305ASM",
+    "MontgomeryMul",
+    "Ed25519ASM",
+    "ConstantTimeOps",
+    "FirewallASM",
 ]

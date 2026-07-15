@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import time
 import argparse
 
 
@@ -133,6 +134,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import time
-
     main()

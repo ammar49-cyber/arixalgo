@@ -358,6 +358,8 @@ class SecurityMiddleware:
         # After generation:
         result = security.verify_output(text)
 """
+
+    def __init__(self, config: Optional[SecurityConfig] = None):
         self.config = config or SecurityConfig()
         self.authenticator = Authenticator(self.config.auth)
         self.prompt_filter = PromptFilter(self.config.prompt_filter)
