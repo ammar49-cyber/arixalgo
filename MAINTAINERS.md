@@ -1,5 +1,8 @@
 # Maintainers
 
+- Currently unavailable
+- Might be available soon...
+
 ## BDFL
 
 - **Ammar [SNEPPX]** — [algoSNEPPX@gmail.com](mailto:algoSNEPPX@gmail.com)

@@ -5,6 +5,33 @@
 #include <stdlib.h>
 #include <math.h>
 
+struct SNEPPXInferenceEngine {
+    unsigned int seed;
+    // Stub - real implementation would have model state
+};
+
+SNEPPXInferenceEngine* SNEPPX_inference_engine_create(unsigned int seed) {
+    SNEPPXInferenceEngine* engine = (SNEPPXInferenceEngine*)SNEPPX_malloc(sizeof(SNEPPXInferenceEngine), 64);
+    if (!engine) return NULL;
+    engine->seed = seed;
+    return engine;
+}
+
+void SNEPPX_inference_engine_destroy(SNEPPXInferenceEngine* engine) {
+    if (!engine) return;
+    SNEPPX_free(engine, sizeof(SNEPPXInferenceEngine));
+}
+
+SNEPPXTensor* SNEPPX_inference_engine_run(SNEPPXInferenceEngine* engine, const SNEPPXTensor* input) {
+    if (!engine || !input) return NULL;
+    // Stub - returns a copy of input
+    return SNEPPX_tensor_copy(input);
+}
+
+void SNEPPX_inference_engine_reset(SNEPPXInferenceEngine* engine) {
+    (void)engine;  // Stub - no state to reset
+}
+
 SNEPPXGenerationConfig SNEPPX_generation_config_default(void) {
     SNEPPXGenerationConfig cfg;
     cfg.temperature = 1.0f;

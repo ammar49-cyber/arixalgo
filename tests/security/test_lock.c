@@ -29,7 +29,7 @@ static void test_lock_init_destroy(void) {
 static void test_lock_acquire_release(void) {
     SNEPPXLock* lock = SNEPPX_lock_init();
     SNEPPX_lock_acquire(lock);
-    ASSERT(lock->held == 1 || lock->held == 0, "lock acquired");
+    ASSERT(SNEPPX_lock_is_held(lock) == 1, "lock acquired");
     SNEPPX_lock_release(lock);
     SNEPPX_lock_destroy(lock);
 }

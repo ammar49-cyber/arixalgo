@@ -41,6 +41,11 @@ typedef struct {
 } SNEPPXModel;
 
 SNEPPXArchConfig SNEPPX_arch_config_default(void);
+int SNEPPX_arch_has_avx(void);
+int SNEPPX_arch_has_avx2(void);
+int SNEPPX_arch_has_neon(void);
+int SNEPPX_arch_num_cores(void);
+int SNEPPX_arch_cache_line_size(void);
 SNEPPXModel* SNEPPX_model_create(const SNEPPXArchConfig* config);
 void SNEPPX_model_destroy(SNEPPXModel* model);
 int SNEPPX_model_forward(SNEPPXModel* model, const SNEPPXTensor* input, SNEPPXTensor** output);

@@ -6,6 +6,13 @@
 #include "multidimensional_tensor_engine.h"
 #include <stddef.h>
 
+typedef struct SNEPPXInferenceEngine SNEPPXInferenceEngine;
+
+SNEPPXInferenceEngine* SNEPPX_inference_engine_create(unsigned int seed);
+void SNEPPX_inference_engine_destroy(SNEPPXInferenceEngine* engine);
+SNEPPXTensor* SNEPPX_inference_engine_run(SNEPPXInferenceEngine* engine, const SNEPPXTensor* input);
+void SNEPPX_inference_engine_reset(SNEPPXInferenceEngine* engine);
+
 typedef struct {
     float temperature;
     float top_p;

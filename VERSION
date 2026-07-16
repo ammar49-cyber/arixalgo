@@ -3,4 +3,4 @@ Release Date: 2026-07-15
 Status: Feature Complete — Unified Python Bindings (Phases 1-7), CLI Entry Points, Dispatch Layer, Crypto/Security/Algo/Kernel/Infra/ASM Interface
 Security: S0-S9 Complete — 21,809+ lines of C security + 31 Python test suites (300+ tests) + 4-ring firewall
 Build: cmake 3.16+, C11/C20, Python 3.11+, macOS/Linux/Windows + MASM x64 (Windows)
-Total Codebase: ~130,000+ lines across 630+ files
+Total Codebase: ~117,000+ lines across 630+ files

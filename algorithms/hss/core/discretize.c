@@ -1,5 +1,54 @@
 #include "hierarchical_state_space.h"
 #include <string.h>
+#include <math.h>
+
+void SNEPPX_hss_discretize_zoh(const float* A, const float* B, int state_dim, float dt, float* Ad, float* Bd) {
+    for (int i = 0; i < state_dim; i++) {
+        for (int j = 0; j < state_dim; j++) {
+            float a_ij = A[i * state_dim + j];
+            if (i == j) {
+                Ad[i * state_dim + j] = 1.0f + a_ij * dt;
+            } else {
+                Ad[i * state_dim + j] = a_ij * dt;
+            }
+        }
+    }
+    for (int i = 0; i < state_dim; i++) {
+        for (int j = 0; j < state_dim; j++) {
+            Bd[i * state_dim + j] = B[i * state_dim + j] * dt;
+        }
+    }
+}
+
+void SNEPPX_hss_discretize_bilinear(const float* A, const float* B, int state_dim, float dt, float* Ad, float* Bd) {
+    float half_dt = 0.5f * dt;
+    for (int i = 0; i < state_dim; i++) {
+        for (int j = 0; j < state_dim; j++) {
+            float a_ij = A[i * state_dim + j];
+            if (i == j) {
+                Ad[i * state_dim + j] = (1.0f + half_dt * a_ij) / (1.0f - half_dt * a_ij);
+            } else {
+                Ad[i * state_dim + j] = (half_dt * a_ij) / (1.0f - half_dt * A[i * state_dim + i]);
+            }
+        }
+    }
+    for (int i = 0; i < state_dim; i++) {
+        for (int j = 0; j < state_dim; j++) {
+            Bd[i * state_dim + j] = B[i * state_dim + j] * dt / (1.0f - half_dt * A[i * state_dim + i]);
+        }
+    }
+}
+
+int SNEPPX_hss_hierarchical_levels(int state_dim, int min_dim) {
+    if (state_dim <= min_dim || min_dim <= 0) return 0;
+    int levels = 0;
+    int current = state_dim;
+    while (current > min_dim) {
+        current = current / 2;
+        levels++;
+    }
+    return levels;
+}
 
 void SNEPPX_hss_discretize(SNEPPXHSSLayer* layer) {
     size_t s_dim = layer->A->shape[0];

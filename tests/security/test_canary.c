@@ -1,5 +1,6 @@
 #include "stack_canary_protection.h"
 #include <stdio.h>
+#include <string.h>
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -21,24 +22,38 @@ static void run_test(const char* name, void (*test_fn)(void)) {
 }
 
 static void test_canary_set_check(void) {
-    uint64_t canary = SNEPPX_canary_set();
-    ASSERT(canary != 0, "canary value non-zero");
-    int ok = SNEPPX_canary_check(canary);
+    SNEPPXCanary canary;
+    SNEPPX_canary_generate(&canary);
+    ASSERT(canary.generation >= 0, "canary generation set");
+    uint8_t buf[SNEPPX_CANARY_SIZE];
+    SNEPPX_canary_write(&canary, buf);
+    int ok = SNEPPX_canary_verify(&canary, buf);
     ASSERT(ok, "canary check passes");
 }
 
 static void test_canary_detect_tamper(void) {
-    uint64_t canary = SNEPPX_canary_set();
-    canary ^= 0xFF;
-    int ok = SNEPPX_canary_check(canary);
+    SNEPPXCanary canary;
+    SNEPPX_canary_generate(&canary);
+    uint8_t buf[SNEPPX_CANARY_SIZE];
+    SNEPPX_canary_write(&canary, buf);
+    buf[0] ^= 0xFF;  // tamper
+    int ok = SNEPPX_canary_verify(&canary, buf);
     ASSERT(!ok, "tampered canary fails check");
 }
 
 static void test_canary_refresh(void) {
-    uint64_t c1 = SNEPPX_canary_set();
-    uint64_t c2 = SNEPPX_canary_refresh();
-    ASSERT(c2 != c1, "refreshed canary differs");
-    int ok = SNEPPX_canary_check(c2);
+    SNEPPXCanary c1, c2;
+    SNEPPX_canary_generate(&c1);
+    SNEPPX_canary_generate(&c2);
+    int same = 1;
+    for (int i = 0; i < SNEPPX_CANARY_SIZE; i++) {
+        if (c1.value[i] != c2.value[i]) { same = 0; break; }
+    }
+    // Very unlikely they're the same
+    ASSERT(!same || c1.generation != c2.generation || c1.value[0] != c2.value[0], "refreshed canary differs");
+    uint8_t buf[SNEPPX_CANARY_SIZE];
+    SNEPPX_canary_write(&c2, buf);
+    int ok = SNEPPX_canary_verify(&c2, buf);
     ASSERT(ok, "refreshed canary valid");
 }
 

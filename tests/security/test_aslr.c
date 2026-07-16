@@ -20,30 +20,33 @@ static void run_test(const char* name, void (*test_fn)(void)) {
     tests_passed++;
 }
 
-static void test_aslr_alloc_free(void) {
-    void* p = SNEPPX_aslr_alloc(256);
-    ASSERT(p != NULL, "aslr alloc 256");
-    SNEPPX_aslr_free(p, 256);
+static void test_aslr_random_offset(void) {
+    size_t off = SNEPPX_aslr_random_offset(4096);
+    ASSERT(off < 4096, "random offset within range");
+    ASSERT((off & 4095) == 0, "random offset page-aligned");
 }
 
-static void test_aslr_alloc_randomized(void) {
-    void* p1 = SNEPPX_aslr_alloc(64);
-    void* p2 = SNEPPX_aslr_alloc(64);
-    ASSERT(p1 != NULL, "aslr alloc 1");
-    ASSERT(p2 != NULL, "aslr alloc 2");
-    SNEPPX_aslr_free(p1, 64);
-    SNEPPX_aslr_free(p2, 64);
+static void test_aslr_random_offset_varied(void) {
+    size_t off1 = SNEPPX_aslr_random_offset(65536);
+    size_t off2 = SNEPPX_aslr_random_offset(65536);
+    ASSERT(off1 < 65536, "offset1 within range");
+    ASSERT(off2 < 65536, "offset2 within range");
 }
 
-static void test_aslr_mprotect(void) {
-    int ret = SNEPPX_aslr_mprotect(NULL, 0, SNEPPX_ASLR_RW);
-    ASSERT(ret == 0, "mprotect stub returns 0");
+static void test_aslr_apply(void) {
+    char buf[256];
+    void* ptr = (void*)buf;
+    size_t sz = sizeof(buf);
+    SNEPPX_aslr_apply(&ptr, &sz, 128);
+    ASSERT(sz <= sizeof(buf), "size not increased");
+    // offset might be 0, so we just check it doesn't crash
+    ASSERT(ptr != NULL, "ptr valid after apply");
 }
 
 int main(void) {
-    run_test("aslr_alloc_free", test_aslr_alloc_free);
-    run_test("aslr_alloc_randomized", test_aslr_alloc_randomized);
-    run_test("aslr_mprotect", test_aslr_mprotect);
+    run_test("aslr_random_offset", test_aslr_random_offset);
+    run_test("aslr_random_offset_varied", test_aslr_random_offset_varied);
+    run_test("aslr_apply", test_aslr_apply);
     printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

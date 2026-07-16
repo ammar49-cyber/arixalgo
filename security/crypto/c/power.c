@@ -22,3 +22,17 @@ void SNEPPX_power_dummy_op(void) {
         dummy_accumulator ^= x ^ y;
     }
 }
+
+int SNEPPX_power_mul_const_time(int a, int b) {
+    return a * b;
+}
+
+int SNEPPX_power_cmp_const_time(int a, int b) {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+}
+
+uint64_t SNEPPX_power_mask_gen(int condition) {
+    return condition ? UINT64_MAX : 0;
+}

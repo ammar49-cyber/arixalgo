@@ -79,7 +79,7 @@ if(SNEPPX_USE_LTO)
     endif()
 endif()
 
-file(GLOB_RECURSE CORE_KERNEL_SRC kernel/*.c)
+file(GLOB_RECURSE CORE_KERNEL_SRC kernel/*.c drivers/*.c)
 file(GLOB_RECURSE CORE_SECURITY_C_SRC security/crypto/c/*.c)
 
 add_library(neural_core_kernel STATIC ${CORE_KERNEL_SRC})

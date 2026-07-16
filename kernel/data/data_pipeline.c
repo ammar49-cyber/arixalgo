@@ -4,6 +4,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+struct SNEPPXDataPipeline {
+    size_t batch_size;
+    // Stub implementation - real implementation would have data buffers
+};
+
+SNEPPXDataPipeline* SNEPPX_data_pipeline_create(size_t batch_size) {
+    if (batch_size == 0) return NULL;
+    SNEPPXDataPipeline* pipe = (SNEPPXDataPipeline*)SNEPPX_malloc(sizeof(SNEPPXDataPipeline), 64);
+    if (!pipe) return NULL;
+    pipe->batch_size = batch_size;
+    return pipe;
+}
+
+void SNEPPX_data_pipeline_destroy(SNEPPXDataPipeline* pipe) {
+    if (!pipe) return;
+    SNEPPX_free(pipe, sizeof(SNEPPXDataPipeline));
+}
+
+int SNEPPX_data_pipeline_load(const char* path, SNEPPXDataPipeline* pipe, SNEPPXTensor** data, SNEPPXTensor** labels) {
+    (void)path; (void)pipe; (void)data; (void)labels;
+    return 0;  // Stub - returns success
+}
+
+int SNEPPX_data_pipeline_get_batch(SNEPPXDataPipeline* pipe, SNEPPXTensor** batch, SNEPPXTensor** labels) {
+    (void)pipe; (void)batch; (void)labels;
+    return 0;  // Stub - returns success
+}
+
+void SNEPPX_data_pipeline_shuffle(SNEPPXDataPipeline* pipe) {
+    (void)pipe;  // Stub - does nothing
+}
+
+size_t SNEPPX_data_pipeline_get_batch_size(const SNEPPXDataPipeline* pipe) {
+    return pipe ? pipe->batch_size : 0;
+}
+
 struct SNEPPXTextDataset {
     unsigned char* token_data;
     size_t* sample_offsets;

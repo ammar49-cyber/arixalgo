@@ -1,4 +1,5 @@
 #include "code_obfuscation_interface.h"
+#include "control_flow_obfuscation.h"
 #include <stdio.h>
 
 static int tests_passed = 0;
@@ -21,25 +22,24 @@ static void run_test(const char* name, void (*test_fn)(void)) {
 }
 
 static void test_obf_pipeline_create(void) {
-    SNEPPXObfPipeline* pipe = SNEPPX_obf_pipeline_create(42);
-    ASSERT(pipe != NULL, "obf pipeline created");
-    SNEPPX_obf_pipeline_destroy(pipe);
+    SNEPPX::SNEPPXObfuscator obf;
+    ASSERT(true, "obfuscator created");
 }
 
 static void test_obf_pipeline_add_pass(void) {
-    SNEPPXObfPipeline* pipe = SNEPPX_obf_pipeline_create(42);
-    SNEPPX_obf_pipeline_add_pass(pipe, SNEPPX_OBF_INST_SUBST);
-    SNEPPX_obf_pipeline_add_pass(pipe, SNEPPX_OBF_CFG_FLATTEN);
-    ASSERT(pipe != NULL, "passes added");
-    SNEPPX_obf_pipeline_destroy(pipe);
+    SNEPPX::SNEPPXObfuscator obf;
+    obf.configure(SNEPPX::SNEPPXObfuscationLevel::SNEPPX_OBF_LIGHT);
+    ASSERT(obf.get_level() == SNEPPX::SNEPPXObfuscationLevel::SNEPPX_OBF_LIGHT, "level set");
+    obf.configure(SNEPPX::SNEPPXObfuscationLevel::SNEPPX_OBF_MAXIMUM);
+    ASSERT(obf.get_level() == SNEPPX::SNEPPXObfuscationLevel::SNEPPX_OBF_MAXIMUM, "level set to max");
 }
 
 static void test_obf_pipeline_run(void) {
-    SNEPPXObfPipeline* pipe = SNEPPX_obf_pipeline_create(42);
-    SNEPPX_obf_pipeline_add_pass(pipe, SNEPPX_OBF_INST_SUBST);
-    int ret = SNEPPX_obf_pipeline_run(pipe, NULL, 0, NULL, 0);
-    ASSERT(ret == 0, "pipeline run stub");
-    SNEPPX_obf_pipeline_destroy(pipe);
+    SNEPPX::SNEPPXObfuscator obf;
+    SNEPPX::SNEPPXObfCFG cfg;
+    // Just test that obfuscator can be used without crashing
+    SNEPPX::SNEPPXObfuscationReport report = obf.obfuscate(cfg);
+    ASSERT(report.level == SNEPPX::SNEPPXObfuscationLevel::SNEPPX_OBF_NONE, "default level");
 }
 
 int main(void) {

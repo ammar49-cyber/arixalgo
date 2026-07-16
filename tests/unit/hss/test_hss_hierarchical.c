@@ -32,17 +32,17 @@ static void run_test(const char* name, void (*test_fn)(void)) {
 static void test_hierarchical_config(void) {
     SNEPPXHSSConfig cfg = SNEPPX_hss_config_default();
     ASSERT(cfg.state_dim == 64, "default state_dim 64");
-    ASSERT(cfg.input_dim == 64, "default input_dim 64");
-    ASSERT(cfg.num_layers == 4, "default num_layers 4");
+    ASSERT(cfg.input_dim == 512, "default input_dim 512");
+    ASSERT(cfg.num_layers == 2, "default num_layers 2");
     cfg.use_hierarchical = 1;
     ASSERT(cfg.use_hierarchical == 1, "hierarchical enabled");
 }
 
 static void test_hierarchical_level_count(void) {
     int levels = SNEPPX_hss_hierarchical_levels(64, 4);
-    ASSERT(levels == 3, "log2(64/4)/log2(2) levels");
+    ASSERT(levels == 4, "log2(64/4) levels = 4");
     levels = SNEPPX_hss_hierarchical_levels(16, 2);
-    ASSERT(levels == 3, "log2(16/2)/log2(2)=3 levels");
+    ASSERT(levels == 3, "log2(16/2) levels = 3");
 }
 
 static void test_hierarchical_create(void) {

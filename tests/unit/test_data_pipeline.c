@@ -24,7 +24,7 @@ static void run_test(const char* name, void (*test_fn)(void)) {
 static void test_data_pipeline_create(void) {
     SNEPPXDataPipeline* pipe = SNEPPX_data_pipeline_create(256);
     ASSERT(pipe != NULL, "pipeline created");
-    ASSERT(pipe->batch_size == 256, "batch size set");
+    ASSERT(SNEPPX_data_pipeline_get_batch_size(pipe) == 256, "batch size set");
     SNEPPX_data_pipeline_destroy(pipe);
 }
 

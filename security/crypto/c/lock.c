@@ -1,12 +1,82 @@
 #include "synchronization_lock_interface.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 #if defined(_WIN32)
 #include <windows.h>
 #else
 #include <sys/mman.h>
 #include <errno.h>
+#include <pthread.h>
 #endif
+
+typedef struct SNEPPXLock {
+#if defined(_WIN32)
+    CRITICAL_SECTION cs;
+#else
+    pthread_mutex_t mutex;
+#endif
+    int held;
+} SNEPPXLock;
+
+SNEPPXLock* SNEPPX_lock_init(void) {
+    SNEPPXLock* lock = (SNEPPXLock*)malloc(sizeof(SNEPPXLock));
+    if (!lock) return NULL;
+#if defined(_WIN32)
+    InitializeCriticalSection(&lock->cs);
+#else
+    pthread_mutex_init(&lock->mutex, NULL);
+#endif
+    lock->held = 0;
+    return lock;
+}
+
+void SNEPPX_lock_destroy(SNEPPXLock* lock) {
+    if (!lock) return;
+#if defined(_WIN32)
+    DeleteCriticalSection(&lock->cs);
+#else
+    pthread_mutex_destroy(&lock->mutex);
+#endif
+    free(lock);
+}
+
+void SNEPPX_lock_acquire(SNEPPXLock* lock) {
+    if (!lock) return;
+#if defined(_WIN32)
+    EnterCriticalSection(&lock->cs);
+#else
+    pthread_mutex_lock(&lock->mutex);
+#endif
+    lock->held = 1;
+}
+
+void SNEPPX_lock_release(SNEPPXLock* lock) {
+    if (!lock) return;
+    lock->held = 0;
+#if defined(_WIN32)
+    LeaveCriticalSection(&lock->cs);
+#else
+    pthread_mutex_unlock(&lock->mutex);
+#endif
+}
+
+int SNEPPX_lock_try_acquire(SNEPPXLock* lock) {
+    if (!lock) return 0;
+#if defined(_WIN32)
+    int result = TryEnterCriticalSection(&lock->cs);
+    if (result) lock->held = 1;
+    return result;
+#else
+    int result = pthread_mutex_trylock(&lock->mutex);
+    if (result == 0) lock->held = 1;
+    return result == 0;
+#endif
+}
+
+int SNEPPX_lock_is_held(const SNEPPXLock* lock) {
+    return lock ? lock->held : 0;
+}
 
 int SNEPPX_mlock(void* ptr, size_t len) {
     if (!ptr || !len) return -1;

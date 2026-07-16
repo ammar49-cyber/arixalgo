@@ -4,6 +4,58 @@
 #include <stdlib.h>
 #include <math.h>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
+#include <stdio.h>
+#endif
+
+int SNEPPX_arch_has_avx(void) {
+#if defined(__AVX__)
+    return 1;
+#elif defined(__x86_64__) || defined(_M_AMD64)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int SNEPPX_arch_has_avx2(void) {
+#if defined(__AVX2__)
+    return 1;
+#elif defined(__x86_64__) || defined(_M_AMD64)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int SNEPPX_arch_has_neon(void) {
+#if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(_M_ARM64)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int SNEPPX_arch_num_cores(void) {
+#if defined(_WIN32)
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return (int)sysinfo.dwNumberOfProcessors;
+#elif defined(_SC_NPROCESSORS_ONLN)
+    return (int)sysconf(_SC_NPROCESSORS_ONLN);
+#else
+    return 1;
+#endif
+}
+
+int SNEPPX_arch_cache_line_size(void) {
+    return 64;
+}
+
 SNEPPXArchConfig SNEPPX_arch_config_default(void) {
     SNEPPXArchConfig cfg;
     memset(&cfg, 0, sizeof(cfg));

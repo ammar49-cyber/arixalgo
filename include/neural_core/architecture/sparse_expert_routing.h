@@ -70,6 +70,9 @@ float SNEPPX_ser_aux_loss(const SNEPPXTensor* gate_weights, const int* expert_in
 void SNEPPX_ser_expert_capacity_balance(SNEPPXTensor* gate_weights, int* expert_indices,
                                       size_t num_tokens, size_t num_active,
                                       size_t expert_capacity);
+float SNEPPX_ser_importance_loss(const SNEPPXTensor* gate_weights, const int* expert_indices, int num_experts);
+float SNEPPX_ser_aux_load_balance(const SNEPPXTensor* gate_weights, const int* expert_indices,
+                                 int num_experts, size_t num_tokens);
 size_t SNEPPX_ser_get_params(const SNEPPXSERModel* model, SNEPPXTensor** out_params, size_t max_params);
 int SNEPPX_ser_build_train_graph(SNEPPXSERModel* model, SNEPPXTape* tape,
                                SNEPPXVariable* input_var,
