@@ -6,8 +6,8 @@
 
 // Coverage counters — compile with -DCOVERAGE_ENABLED
 #ifdef COVERAGE_ENABLED
-    #define COV_HIT()   do { extern long long __cov_counter_##__LINE__; __cov_counter_##__LINE__++; } while(0)
-    #define COV_BRANCH(c) do { extern long long __cov_branch_taken_##__LINE__; extern long long __cov_branch_not_##__LINE__; if(c) __cov_branch_taken_##__LINE__++; else __cov_branch_not_##__LINE__++; } while(0)
+    #define COV_HIT()   do { static long long __cov_counter = 0; __cov_counter++; } while(0)
+    #define COV_BRANCH(c) do { static long long __cov_branch_taken = 0; static long long __cov_branch_not = 0; if(c) __cov_branch_taken++; else __cov_branch_not++; } while(0)
 #else
     #define COV_HIT()
     #define COV_BRANCH(c) ((void)(c))

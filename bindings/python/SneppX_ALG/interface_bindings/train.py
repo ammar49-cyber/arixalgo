@@ -102,6 +102,8 @@ class Optimizer:
 
     def step(self):
         if _HAS_C_BACKEND:
+            if hasattr(self, '_opt') and self._opt is not None:
+                self._opt.step(self._params, self._grads)
             return
         lr = getattr(self, "lr", 0.01)
         for p, g in zip(self._params, self._grads):

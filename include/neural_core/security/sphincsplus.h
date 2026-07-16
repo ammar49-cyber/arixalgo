@@ -1,5 +1,5 @@
-#ifndef SNEPPX_SPHINXPLUS_H
-#define SNEPPX_SPHINXPLUS_H
+#ifndef SNEPPX_SPHINCS_PLUS_H
+#define SNEPPX_SPHINCS_PLUS_H
 
 #include <stdint.h>
 #include <stddef.h>

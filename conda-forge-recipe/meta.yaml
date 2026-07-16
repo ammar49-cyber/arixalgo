@@ -21,6 +21,8 @@ build:
     - SNEPPX_USE_ASAN=OFF
     - SNEPPX_USE_UBSAN=OFF
   skip_existing: true
+  cmake_args:
+    - -DSNEPPX_BUILD_CUDA=ON
 
 requirements:
   build:

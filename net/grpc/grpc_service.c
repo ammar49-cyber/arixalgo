@@ -21,7 +21,7 @@ void SNEPPX_grpc_server_wait(SNEPPXGRPCServer* server) { (void)server; }
 SNEPPXGRPCStub* SNEPPX_grpc_stub_create(const char* target) {
     if (!target) return NULL;
     SNEPPXGRPCStub* stub = (SNEPPXGRPCStub*)calloc(1, sizeof(SNEPPXGRPCStub));
-    if (stub) { strncpy(stub->target, target, sizeof(stub->target)-1); }
+    if (stub) { snprintf(stub->target, sizeof(stub->target), "%s", target ? target : ""); }
     return stub;
 }
 

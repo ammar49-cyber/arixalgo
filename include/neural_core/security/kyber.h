@@ -10,6 +10,10 @@
 #define KYBER_SSBYTES 32
 #define KYBER_K 3
 
+#define KYBER_VARIANT_512 2
+#define KYBER_VARIANT_768 3
+#define KYBER_VARIANT_1024 4
+
 int SNEPPX_kyber_keygen(uint8_t *pk, uint8_t *sk, int variant);
 int SNEPPX_kyber_encaps(uint8_t *ct, uint8_t *ss, const uint8_t *pk, int variant);
 int SNEPPX_kyber_decaps(uint8_t *ss, const uint8_t *ct, const uint8_t *sk, int variant);

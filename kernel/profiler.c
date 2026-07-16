@@ -1,9 +1,12 @@
 #include "neural_core/kernel/profiler.h"
-#include <cuda_runtime.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+
+#ifdef SNEPPX_HAS_CUDA
+#include <cuda_runtime.h>
+#endif
 
 /* =========================================================================
  * Range marker stack (lightweight NVTX substitute)
@@ -38,6 +41,8 @@ int SNEPPX_range_get_depth(void) {
  * Kernel Timer
  * ========================================================================= */
 
+#ifdef SNEPPX_HAS_CUDA
+
 int SNEPPX_kernel_timer_init(SNEPPX_KernelTimer* kt) {
     if (!kt) return -1;
     cudaEventCreate(&kt->start);
@@ -63,6 +68,20 @@ void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt) {
     cudaEventDestroy(kt->start);
     cudaEventDestroy(kt->end);
 }
+
+#else
+int SNEPPX_kernel_timer_init(SNEPPX_KernelTimer* kt) { (void)kt; return -1; }
+void SNEPPX_kernel_timer_start(SNEPPX_KernelTimer* kt, void* stream) { (void)kt; (void)stream; }
+float SNEPPX_kernel_timer_stop(SNEPPX_KernelTimer* kt, void* stream) { (void)kt; (void)stream; return 0.0f; }
+void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt) { (void)kt; }
+#endif
+
+#else
+int SNEPPX_kernel_timer_init(SNEPPX_KernelTimer* kt) { (void)kt; return -1; }
+void SNEPPX_kernel_timer_start(SNEPPX_KernelTimer* kt, void* stream) { (void)kt; (void)stream; }
+float SNEPPX_kernel_timer_stop(SNEPPX_KernelTimer* kt, void* stream) { (void)kt; (void)stream; return 0.0f; }
+void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt) { (void)kt; }
+#endif
 
 /* =========================================================================
  * Profiler
@@ -157,6 +176,12 @@ char* SNEPPX_profiler_to_json(const SNEPPX_Profiler* prof) {
     pos += snprintf(buf + pos, cap - pos, "{\n  \"profiler\": [\n");
     for (int i = 0; i < prof->num_entries; i++) {
         const SNEPPX_ProfilerEntry* e = &prof->entries[i];
+        if (pos + 512 >= cap) {
+            cap = cap * 2 + 512;
+            char* nb = (char*)realloc(buf, cap);
+            if (!nb) { free(buf); return NULL; }
+            buf = nb;
+        }
         int written = snprintf(buf + pos, cap - pos,
             "    {\"name\":\"%s\",\"calls\":%d,\"total_ms\":%.3f,"
             "\"avg_ms\":%.3f,\"min_ms\":%.3f,\"max_ms\":%.3f}%s\n",

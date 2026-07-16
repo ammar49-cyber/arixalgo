@@ -10,7 +10,7 @@ import logging
 def main():
     parser = argparse.ArgumentParser(description="SneppX Inference Server")
     parser.add_argument(
-        "--host", type=str, default="0.0.0.0", help="Bind address (default: 0.0.0.0)"
+        "--host", type=str, default="127.0.0.1", help="Bind address (default: 127.0.0.1)"
     )
     parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     parser.add_argument(

@@ -6,9 +6,8 @@
 # =====================================================================
 FROM nvidia/cuda:12.2-devel-ubuntu22.04 AS builder
 
-ARG DEBIAN_FRONTEND=noninteractive
+ARG PYTHON_SITE=python3.11
 
-# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake ninja-build \
     build-essential \
@@ -32,7 +31,7 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
     -DSNEPPX_BUILD_PYTHON=ON \
     -DSNEPPX_BUILD_CUDA=ON \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -SNEPPX_BUILD_CUDA=ON && \
+    -DSNEPPX_BUILD_CUDA=ON && \
     cmake --build build -j$(nproc) && \
     cmake --install build --prefix /install
 
@@ -60,10 +59,10 @@ COPY --from=builder /usr/local /usr/local
 COPY --from=builder /install /usr/local
 
 # Install Python package
-COPY --from=builder /install/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
+COPY --from=builder /install/lib/${PYTHON_SITE}/dist-packages /usr/local/lib/${PYTHON_SITE}/dist-packages
 
 # Set Python path
-ENV PYTHONPATH=/usr/local/lib/python3.11/dist-packages
+ENV PYTHONPATH=/usr/local/lib/${PYTHON_SITE}/dist-packages
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace
@@ -87,9 +86,9 @@ COPY --from=builder /usr/local /usr/local
 COPY --from=builder /install /usr/local
 
 # Install Python package
-COPY --from=builder /install/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
+COPY --from=builder /install/lib/${PYTHON_SITE}/dist-packages /usr/local/lib/${PYTHON_SITE}/dist-packages
 
-ENV PYTHONPATH=/usr/local/lib/python3.11/dist-packages
+ENV PYTHONPATH=/usr/local/lib/${PYTHON_SITE}/dist-packages
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace
@@ -127,15 +126,17 @@ WORKDIR /sneppx
 # =====================================================================
 FROM python:3.11-slim AS py-runtime
 
+ARG PYTHON_SITE=python3.11
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libopenblas0 \
     libomp5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
+COPY --from=builder /usr/local/lib/${PYTHON_SITE}/dist-packages /usr/local/lib/${PYTHON_SITE}/dist-packages
 COPY --from=builder /usr/local/lib /usr/local/lib
 
-ENV PYTHONPATH=/usr/local/lib/python3.11/dist-packages
+ENV PYTHONPATH=/usr/local/lib/${PYTHON_SITE}/dist-packages
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace

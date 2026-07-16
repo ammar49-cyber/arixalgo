@@ -50,6 +50,7 @@ void SNEPPX_profiler_print(const SNEPPX_Profiler* prof);
 char* SNEPPX_profiler_to_json(const SNEPPX_Profiler* prof);
 
 /* CUDA kernel duration helper: wraps a kernel launch with timing */
+#ifdef SNEPPX_HAS_CUDA
 typedef struct {
     cudaEvent_t start;
     cudaEvent_t end;
@@ -76,6 +77,14 @@ void SNEPPX_kernel_timer_destroy(SNEPPX_KernelTimer* kt);
         cudaEventDestroy(_p_start); \
         cudaEventDestroy(_p_end); \
     } while(0)
+#else
+typedef struct { int _unused; } SNEPPX_KernelTimer;
+#define SNEPPX_kernel_timer_init(kt) (-1)
+#define SNEPPX_kernel_timer_start(kt, stream) ((void)0)
+#define SNEPPX_kernel_timer_stop(kt, stream) (0.0f)
+#define SNEPPX_kernel_timer_destroy(kt) ((void)0)
+#define SNEPPX_PROFILE_KERNEL(prof, name, stream, kernel_call) do { kernel_call; } while(0)
+#endif
 
 /* Stack-based NVTX-style range markers (no NVTX dependency) */
 void SNEPPX_range_push(const char* name);

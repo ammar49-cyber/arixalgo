@@ -1019,6 +1019,7 @@ pub unsafe extern "C" fn arix_dist_all_reduce(data: *mut f32, count: usize, op: 
         return e as i32;
     }
 
+    write_f32_slice(data, &buf);
     DistError::SUCCESS as i32
 }
 
@@ -1043,6 +1044,7 @@ pub unsafe extern "C" fn arix_dist_ring_all_reduce(data: *mut f32, count: usize)
         return e as i32;
     }
 
+    write_f32_slice(data, &buf);
     DistError::SUCCESS as i32
 }
 

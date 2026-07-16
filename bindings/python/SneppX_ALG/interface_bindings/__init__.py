@@ -1282,3 +1282,36 @@ __all__ = [
     "ConstantTimeOps",
     "FirewallASM",
 ]
+
+# Lazy import helper — allows accessing submodules even if direct imports
+# failed due to circular dependency chains.
+_LAZY = {}
+def __getattr__(name):
+    if name in _LAZY:
+        return _LAZY[name]
+    if name.startswith('_'):
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    # Try to lazily import common submodules
+    _lazy_map = {
+        'tensor': '.tensor',
+        'nn': '.nn',
+        'optim': '.optim',
+        'train': '.train',
+        'Tensor': '.tensor',
+        'Parameter': '.tensor',
+        'Linear': '.nn',
+        'SGD': '.optim',
+        'Adam': '.optim',
+        'AdamW': '.optim',
+        'Module': '.nn',
+        'Dataset': '.data',
+        'DataLoader': '.data',
+    }
+    if name in _lazy_map:
+        import importlib
+        mod = importlib.import_module(_lazy_map[name], __package__)
+        attr = getattr(mod, name, None)
+        if attr is not None:
+            _LAZY[name] = attr
+            return attr
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

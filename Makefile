@@ -8,7 +8,7 @@ BUILD_DIR      ?= build
 BUILD_TYPE     ?= Release
 BUILD_PY_DIR   ?= build_py
 BUILD_BENCH_DIR ?= build_bench
-CMAKE_ARGS     ?= -DARIX_BUILD_TESTS=ON -DARIX_BUILD_BENCHMARKS=ON
+CMAKE_ARGS     ?= -DSNEPPX_BUILD_TESTS=ON -DSNEPPX_BUILD_BENCHMARKS=ON
 
 SHELL := $(shell command -v bash 2>/dev/null || echo cmd)
 
@@ -38,7 +38,7 @@ clean:
 
 # ---- Python bindings ----
 python-build:
-	cmake -B $(BUILD_PY_DIR) -DARIX_BUILD_PYTHON=ON -DARIX_BUILD_TESTS=OFF -DARIX_BUILD_BENCHMARKS=OFF
+	cmake -B $(BUILD_PY_DIR) -DSNEPPX_BUILD_PYTHON=ON -DSNEPPX_BUILD_TESTS=OFF -DSNEPPX_BUILD_BENCHMARKS=OFF
 	cmake --build $(BUILD_PY_DIR) --target _arix_c --config $(BUILD_TYPE) -j$(NPROC)
 
 python-test: python-build
@@ -48,7 +48,7 @@ python-test: python-build
 bench: bench-build bench-run
 
 bench-build:
-	cmake -B $(BUILD_BENCH_DIR) -DARIX_BUILD_BENCHMARKS=ON -DARIX_BUILD_TESTS=OFF
+	cmake -B $(BUILD_BENCH_DIR) -DSNEPPX_BUILD_BENCHMARKS=ON -DSNEPPX_BUILD_TESTS=OFF
 	cmake --build $(BUILD_BENCH_DIR) --target bench_pq_crypto --config $(BUILD_TYPE) -j$(NPROC)
 
 bench-run:
