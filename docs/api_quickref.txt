@@ -1,0 +1,143 @@
+================================================================================
+                  SNEPPX-ALG API QUICK REFERENCE
+================================================================================
+
+================================================================================
+C API (Core Engine)
+================================================================================
+
+--- Tensor ---
+  SNEPPXTensor* SNEPPX_tensor_create(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+  SNEPPXTensor* SNEPPX_tensor_zeros(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+  SNEPPXTensor* SNEPPX_tensor_ones(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+  SNEPPXTensor* SNEPPX_tensor_randn(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+  void          SNEPPX_tensor_destroy(SNEPPXTensor* t);
+
+  // Ops
+  SNEPPXTensor* SNEPPX_tensor_add(const SNEPPXTensor* a, const SNEPPXTensor* b);
+  SNEPPXTensor* SNEPPX_tensor_matmul(const SNEPPXTensor* a, const SNEPPXTensor* b);
+  SNEPPXTensor* SNEPPX_tensor_relu(const SNEPPXTensor* t);
+  SNEPPXTensor* SNEPPX_tensor_softmax(const SNEPPXTensor* t, size_t dim);
+  SNEPPXTensor* SNEPPX_tensor_reshape(const SNEPPXTensor* t, const size_t* shape, size_t ndim);
+  SNEPPXTensor* SNEPPX_tensor_transpose(const SNEPPXTensor* t, size_t dim1, size_t dim2);
+
+  // I/O
+  int           SNEPPX_tensor_save(const SNEPPXTensor* t, const char* path);
+  SNEPPXTensor* SNEPPX_tensor_load(const char* path);
+
+--- Autograd ---
+  SNEPPXVariable* SNEPPX_variable_create(SNEPPXTensor* data, int requires_grad);
+  void            SNEPPX_variable_destroy(SNEPPXVariable* v);
+  SNEPPXTape*     SNEPPX_tape_create(void);
+  void            SNEPPX_tape_backward(SNEPPXTape* tape, SNEPPXVariable* loss);
+  void            SNEPPX_tape_record(SNEPPXTape* tape, SNEPPXVariable* var);
+
+--- Optimizer ---
+  SNEPPXOptimizer* SNEPPX_adamw_create(float lr, float beta1, float beta2, float eps, float wd);
+  SNEPPXOptimizer* SNEPPX_sgd_create(float lr, float momentum, float wd);
+  int              SNEPPX_optimizer_step(SNEPPXOptimizer* opt, SNEPPXTensor** params, SNEPPXTensor** grads, size_t n);
+  void             SNEPPX_optimizer_destroy(SNEPPXOptimizer* opt);
+
+--- Training ---
+  SNEPPXTrainer*   SNEPPX_trainer_create(SNEPPXModel* model, const SNEPPXTrainConfig* config);
+  float            SNEPPX_trainer_train_step(SNEPPXTrainer* trainer, const SNEPPXTensor* input, const SNEPPXTensor* target);
+  int              SNEPPX_trainer_save_checkpoint(SNEPPXTrainer* trainer, const char* path);
+
+--- Memory ---
+  int    SNEPPX_mem_pool_init(void);
+  void*  SNEPPX_pool_alloc(size_t size);
+  void   SNEPPX_pool_free(void* ptr, size_t size);
+
+--- Thread Pool ---
+  SNEPPXThreadPool* SNEPPX_threadpool_create(size_t num_threads);
+  int               SNEPPX_threadpool_submit(SNEPPXThreadPool* pool, SNEPPXTask task);
+  void              SNEPPX_threadpool_wait(SNEPPXThreadPool* pool);
+
+--- Security ---
+  // Post-quantum KEM
+  int SNEPPX_kyber_keypair(uint8_t* pk, uint8_t* sk);
+  int SNEPPX_kyber_encapsulate(uint8_t* ct, uint8_t* ss, const uint8_t* pk);
+  int SNEPPX_kyber_decapsulate(uint8_t* ss, const uint8_t* ct, const uint8_t* sk);
+
+  // Digital signatures
+  int SNEPPX_ed25519_keypair_generate(SNEPPXEd25519Keypair* kp);
+  int SNEPPX_ed25519_sign(const SNEPPXEd25519Keypair* kp, const uint8_t* msg, size_t len, SNEPPXEd25519Signature* sig);
+
+  // Symmetric
+  void SNEPPX_chacha20_encrypt(SNEPPXChaCha20State* state, uint8_t* out, size_t len);
+  int   SNEPPX_aead_encrypt(uint8_t* ct, uint8_t* tag, const uint8_t* pt, size_t pt_len, ...);
+
+================================================================================
+Python API
+================================================================================
+
+--- Tensor ---
+  Tensor.create(shape, dtype)     # Factory
+  Tensor.zeros(shape, dtype)
+  Tensor.ones(shape, dtype)
+  Tensor.randn(shape, dtype)
+  t.shape, t.ndim, t.dtype        # Properties
+  t + y, t - y, t * y, t / y     # Operators
+  t.matmul(y)
+  t.relu(), t.softmax(dim)
+  t.sum(dim), t.mean(dim)
+  t.reshape(new_shape)
+  t.data                          # NumPy array view
+
+--- Neural Network ---
+  Linear(in_features, out_features, bias=True)
+  Embedding(num_embeddings, embedding_dim)
+  LayerNorm(normalized_shape, eps=1e-5)
+  Dropout(p=0.5)
+  MultiheadAttention(embed_dim, num_heads)
+  TransformerBlock(config)
+  Transformer(config)
+
+--- Optimizer ---
+  AdamW(params, lr=3e-4, weight_decay=0.01)
+  SGD(params, lr=0.01, momentum=0.9)
+  Lion(params, lr=1e-4)
+  LAMB(params, lr=1e-3)
+
+--- Scheduler ---
+  CosineAnnealingLR(optimizer, T_max, eta_min=0)
+  LinearWarmupCosineDecay(optimizer, warmup_steps, total_steps)
+  ReduceLROnPlateau(optimizer, factor=0.5, patience=5)
+
+--- Training ---
+  Trainer(model, config)           # config = TrainConfig(...)
+  trainer.train_step(input, target)
+  trainer.fit(dataloader)
+  trainer.save_checkpoint(path)
+
+--- Model Zoo ---
+  from_pretrained("meta-llama/Llama-2-7b-hf")
+  get_model_config("llama2-7b")
+  build_transformer_from_config(config)
+
+--- Quantization ---
+  quantize_int8_sym(tensor)
+  awq_quantize(weight, act_scales)
+  gptq_quantize(weight, dataset, bits=4)
+  QuantizedLinear.from_float(linear, mode)
+
+--- Security ---
+  SecureAllocator()
+  DDoSMitigation(config)
+  TransportSecurity(cert, key)
+  KeyVault()
+  RLHFSafety()
+  AIPromptFilter(topics)
+  SecurityMiddleware(config)
+
+================================================================================
+ENUMS
+================================================================================
+
+  Dtype: FLOAT32, FLOAT64, FLOAT16, BFLOAT16, FLOAT8, INT32, INT64, INT16, INT8, UINT8, BOOL
+  Device: CPU, CUDA, METAL, VULKAN, TPU, NPU
+  OptimizerType: SGD, ADAM, ADAMW, ADAMAX, RMSPROP, ADAGRAD, ADADELTA
+  Activation: RELU, GELU, SWISH
+  NPE OpCode: NOP, LOAD, STORE, ADD, SUB, MUL, DIV, MATMUL, RELU, SOFTMAX, ...
+  AttackType: FGSM, PGD, CW
+  FMSyncMethod: ALL_REDUCE, GOSSIP, TOPOLOGY
