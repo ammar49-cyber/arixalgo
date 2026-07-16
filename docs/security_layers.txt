@@ -1,0 +1,225 @@
+================================================================================
+               SNEPPX-ALG SECURITY LAYERS DEEP DIVE (S0-S9)
+================================================================================
+
+================================================================================
+S0 — BUILD INTEGRITY
+================================================================================
+
+  Purpose: Ensure the software supply chain from source to binary is verifiable
+  and tamper-proof.
+
+  Components:
+  - SBOM generation: CycloneDX SPDX bills of materials
+  - Reproducible builds: Deterministic compilation flags
+  - TUF metadata: Multi-key root/targets/snapshot/timestamp delegation
+  - Signing: All releases signed with Ed25519
+
+  Files: security/updates/
+
+================================================================================
+S1 — MEMORY HARDENING
+================================================================================
+
+  Purpose: Runtime memory protection against corruption, leakage, and exploitation.
+
+  Components:
+  - Guard pages: Inaccessible pages placed before/after heap allocations
+  - Stack canaries: Random values on stack, checked before function return
+  - ASLR: Random base addresses for heap/mmap allocations
+  - Locked memory: mlock() / VirtualLock to prevent swapping of secrets
+  - W^X policy: Memory pages are either writable or executable, never both
+  - Secure allocator: SNEPPX_secure_malloc zeroes on free, guards pages, locks pages
+
+  Key APIs:
+    SNEPPX_secure_malloc(size_t size)
+    SNEPPX_secure_free(void* ptr, size_t size)
+    SNEPPX_stack_canary_check(void)
+    SNEPPX_aslr_randomize(void* addr, size_t size)
+    SNEPPX_memory_lock(void* addr, size_t size)
+
+  Files: security/memory/
+
+================================================================================
+S2 — CODE OBFUSCATION
+================================================================================
+
+  Purpose: Protect intellectual property through code transformation.
+
+  Components:
+  - CFG flattening: Replace natural control flow with dispatcher + state variable
+  - Instruction substitution: Replace standard ops with semantically equivalent
+    but more complex sequences
+  - Opaque predicates: Computed jumps based on invariant conditions
+  - String encryption: Encrypt string literals, decrypt at runtime
+  - VM obfuscation: Translate bytecode to custom VM instruction set
+
+  Language: C++ (obfuscation operates at AST/IR level)
+  Files: security/obfuscation/, security/cpp/
+
+================================================================================
+S3 — RUNTIME MONITORING
+================================================================================
+
+  Purpose: Real-time integrity verification and anomaly detection.
+
+  Components:
+  - Integrity monitor: Periodic hash verification of critical files and memory
+    regions. Detects unauthorized modifications.
+  - Container breakout detection: Monitors namespace boundaries, cgroup
+    escapes, and syscall patterns indicative of container breakout.
+  - ML anomaly detection: Behavioral ML model trained on normal system
+    call patterns; flags deviations in real-time.
+  - File system monitoring: Inotify/ReadDirectoryChangesW wrappers for
+    real-time file change detection.
+
+  Files: security/monitor/
+
+================================================================================
+S4 — NETWORK SECURITY
+================================================================================
+
+  Purpose: Comprehensive network defense.
+
+  4-Ring Firewall Architecture:
+  Ring 1 - Transport: TLS 1.3 with mTLS, certificate pinning, ALPN negotiation
+  Ring 2 - Network: CIDR allow/deny rules, token-bucket rate limiting,
+           connection tracking, SYN flood protection, port knocking
+  Ring 3 - Application: SQLi/XSS/command injection filtering, path traversal
+           prevention, concurrent request limiting
+  Ring 4 - Middleware: set_security() with per-endpoint overrides,
+           check_firewall() in inference pipeline
+
+  Additional:
+  - Noise protocol framework (NK/XX/IK handshakes)
+  - QUIC transport support
+  - DDoS mitigation (multi-layer, adaptive)
+  - Identity management (SPIFFE-compatible)
+
+  MASM Accelerated:
+  - ip_match.asm: CIDR matching with SIMD
+  - rate_counter.asm: Token bucket rate limiting
+  - conn_track.asm: Connection state tracking
+  - port_knock.asm: Port knock sequence validation
+
+  Files: security/network/, security/firewall/
+
+================================================================================
+S5 — AI SAFETY
+================================================================================
+
+  Purpose: Protect against AI-specific attacks, ensure responsible outputs.
+
+  Components:
+  - RLHF safety: Reward model integration for harmlessness training
+  - Differential privacy: DP-SGD with gradient noise and clipping
+  - Prompt injection defense: Semantic intent classification and filtering
+  - Output verification: Toxicity, bias, factual accuracy checks
+  - Watermarking: Algebraic/statistical watermarks in model outputs
+  - Adversarial smoothing: Randomized smoothing for certified robustness
+  - Data poisoning defense: Outlier detection in training data
+
+  Files: security/ai/
+
+================================================================================
+S6 — AI SANITIZER
+================================================================================
+
+  Purpose: Advanced defense against semantic and encoded attacks on ML systems.
+
+  Components:
+  - Semantic injection detection: BERT-based intent classification for prompts
+  - Encoded attack decoder: Base64/hex/unicode/mixed encoding deobfuscation
+  - Token anomaly scoring: Statistical distribution shift detection
+  - Model inversion defense: Gradient masking and output perturbation
+
+  Files: security/ai/ (s5_extensions.c)
+
+================================================================================
+S7 — SUPPLY CHAIN SECURITY
+================================================================================
+
+  Purpose: End-to-end software update integrity.
+
+  Components:
+  - TUF multi-role keys: Root/targets/snapshot/timestamp key delegation
+    with threshold signing
+  - bsdiff deltas: Binary diff/patch for efficient updates
+  - A/B partitions: Dual-slot update with atomic swap and rollback
+  - TPM PCR: Hardware-attested boot measurements
+  - Canary rollout: Staged deployment with automated health checks
+  - Container scanning: SBOM-based CVE matching for container images
+  - SBOM generation: CycloneDX/SPDX format, embedded in release artifacts
+
+  Files: security/updates/
+
+================================================================================
+S8 — FORMAL VERIFICATION
+================================================================================
+
+  Purpose: Mathematical proof of critical security properties.
+
+  Components:
+  - TLA+ parser: Specification language parser for TLA+ specs
+  - LTL model checker: Linear Temporal Logic model checking with
+    explicit state enumeration and symbolic techniques
+  - Symbolic execution: Concolic testing for path coverage
+  - Lean 4 export: Translates verified properties to Lean 4 theorem prover
+  - Invariant checking: Runtime assertion of formal invariants
+
+  Files: security/formal/
+
+================================================================================
+S9 — PENETRATION TESTING
+================================================================================
+
+  Purpose: Continuous automated security assessment.
+
+  Components:
+  - CVE scanner: Version-based dependency vulnerability matching
+  - Network fuzzer: Protocol-aware fuzzing for network-facing components
+  - API security scanner: REST/gRPC endpoint security testing
+  - Supply chain audit: Recursive dependency tree analysis
+  - Compliance auto-checker: Automated regulatory mapping (SOC 2, ISO 27001,
+    HIPAA, GDPR)
+  - Red team automation: Multi-stage attack scenario execution
+  - Self-audit framework: Integrated audit checks for all S0-S8 layers
+
+  Files: security/pentest/
+
+================================================================================
+POST-QUANTUM CRYPTOGRAPHY
+================================================================================
+
+  Kyber (ML-KEM):
+    IND-CCA2 secure key encapsulation. 3 security levels (512/768/1024).
+    Used for: Key exchange in TLS handshake, secure channel establishment.
+
+  Dilithium (ML-DSA):
+    EUF-CMA secure digital signatures. 3 security levels (2/3/5).
+    Used for: Code signing, release verification, identity attestation.
+
+  SPHINCS+:
+    Stateless hash-based signatures. 3 security levels (128/192/256).
+    Used for: Long-term signing, backup verification.
+
+  Classical:
+    AES-256-GCM, ChaCha20-Poly1305, Ed25519, X25519, SHA-2/3, BLAKE3,
+    Argon2id, HKDF, PBKDF2.
+
+  Files: security/crypto/c/, security/crypto/asm/x86_64/
+
+================================================================================
+COMPLIANCE MAPPING
+================================================================================
+
+  S0-S2:  SOC 2 (Security), ISO 27001 (A.8, A.12)
+  S3:     SOC 2 (Monitoring), ISO 27001 (A.12, A.16)
+  S4:     SOC 2 (Network), ISO 27001 (A.13), PCI-DSS (Req 1, 4)
+  S5:     NIST AI RMF, EU AI Act
+  S6:     NIST AI RMF (Detect)
+  S7:     SOC 2 (Change Mgmt), ISO 27001 (A.12), SLSA Level 3+
+  S8:     Common Criteria EAL5+, DO-178C (Formal Methods)
+  S9:     PCI-DSS (Req 11), SOC 2 (Pen Testing), FedRAMP
+
+  Files: security/compliance/
