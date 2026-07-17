@@ -87,20 +87,21 @@ class _CTensorData:
     def __init__(self, shape, dtype="float32", is_cuda=False):
         self.shape = tuple(shape)
         self.dtype = _resolve_dtype(dtype)
-        self.size = math.prod(shape) if shape else 0
+        self.size = math.prod(shape) if shape is not None else 0
         _, itemsize, _ = DTYPE_MAP.get(self.dtype, (None, 4, np.float32))
         self.nbytes = self.size * itemsize
         self._cptr = None
         self._is_cuda = is_cuda
-        if self.size > 0:
-            self._data = bytearray(self.nbytes)
+        self._data = bytearray(self.nbytes)
 
     def _copy_from(self, arr: np.ndarray):
-        if self.size > 0:
+        if self.nbytes > 0:
             self._data[:] = arr.tobytes()
 
     def to_numpy(self):
         _, _, np_dt = DTYPE_MAP.get(self.dtype, (None, 4, np.float32))
+        if self.nbytes == 0:
+            return np.array([], dtype=np_dt).reshape(self.shape).copy()
         return np.frombuffer(self._data, dtype=np_dt).reshape(self.shape).copy()
 
 

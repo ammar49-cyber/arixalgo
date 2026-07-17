@@ -202,9 +202,9 @@ def test_losses():
     pred = Tensor.ones((3,))
     target = Tensor.zeros((3,))
     mse = pred.mse_loss(target)
-    assert mse.data[0] > 0
+    assert mse.item() > 0
     mae = pred.mae_loss(target)
-    assert mae.data[0] > 0
+    assert mae.item() > 0
     print("  test_losses PASS")
 
 
