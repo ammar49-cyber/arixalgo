@@ -1,10 +1,14 @@
 [package]
-name = "neural_core-distributed"
+name = "neural-core-distributed"
 version = "0.5.4"
 edition = "2021"
-authors = ["Ammar [neural_core] <algoneural_core@gmail.com>"]
-description = "Distributed training coordination for neural_core-Algo: node discovery, ring all-reduce, parameter sync, fault tolerance, differential privacy"
+authors = ["Ammar [SNEPPX] <algoSNEPPX@gmail.com>"]
+description = "Distributed training coordination for SNEPPX-ALG: node discovery, ring all-reduce, parameter sync, fault tolerance, differential privacy"
 license = "MIT"
+repository = "https://github.com/ammar49-cyber/sneppx-alg"
+homepage = "https://github.com/ammar49-cyber/sneppx-alg"
+keywords = ["distributed-training", "all-reduce", "machine-learning", "neural-networks", "fault-tolerance"]
+categories = ["algorithms", "science::robotics", "network-programming"]
 
 [lib]
 crate-type = ["cdylib", "staticlib", "lib"]

@@ -2,10 +2,11 @@
 resolver = "2"
 members = [
     "net/distributed",
+    "lib/rust",
 ]
 
 [workspace.package]
 version = "0.5.4"
 edition = "2021"
-authors = ["Ammar [neural_core] <algoneural_core@gmail.com>"]
+authors = ["Ammar [SNEPPX] <algoSNEPPX@gmail.com>"]
 license = "MIT"

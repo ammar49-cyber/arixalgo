@@ -1,76 +1,255 @@
-# Contributing to SNEPPX-Algo
+# Contributing to SNEPPX-Alg
 
 ## Governance
 
-BDFL: Ammar [SNEPPX] <algoSNEPPX@gmail.com>
+**BDFL**: Ammar [SNEPPX] <algoSNEPPX@gmail.com>
 
 All decisions final. No voting. No committees.
 
 ## How to Contribute
 
-### 1. Prepare Your Patch
+### 1. Clone & Branch
 
 ```bash
-git format-patch -1 HEAD
+git clone https://github.com/ammar49-cyber/sneppx-alg.git
+cd sneppx-alg
+git checkout -b feature-name
 ```
 
-### 2. Email Your Patch
+### 2. Development Workflow
 
-Send to algoSNEPPX@gmail.com with subject prefix `[PATCH]`.
+```bash
+# Build with current settings
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
 
-### 3. Wait for Review
+# Run all tests
+cd build && ctest -C Release --output-on-failure
 
-Response time: 7 days typical, 30 days maximum.
+# Tests run automatically on CI (GitHub Actions)
+```
 
-### 4. Address Feedback
+### 3. Verify Changes
 
-Amend your commit. Resend the updated patch.
+```bash
+# Check formatting
+npm run lint  # (if available)
 
-## Patch Requirements
+# Type checking
+npm run typecheck  # (if available)
 
-- [ ] Signed-off-by line present
-- [ ] GPG or Ed25519 signature on commit
-- [ ] All tests pass: `ctest --output-on-failure`
-- [ ] No compiler warnings (use `-Wall -Wextra -Wpedantic`)
-- [ ] Follows coding style (see STYLEGUIDE.md)
-- [ ] Includes tests for new functionality
-- [ ] Updates documentation where relevant
+# Run specific test category
+ctest -C Release -R test_autodiff --output-on-failure
+```
 
-## Coding Style
+### 4. Commit Changes
 
-### C
+```bash
+# Stage files
+git add -A
 
-- 4 spaces, no tabs
-- snake_case for functions
-- PascalCase for structs
-- SCREAMING_SNAKE_CASE for macros and enums
-- 80 column limit
-- Braces on same line (Attach style)
-- Pointer asterisk on the right: `int* p`
+# Create conventional commit message
+git commit -m "feat(module): add new functionality"
+```
 
-### C++
+## Contribution Guidelines
 
-- Google style with exceptions
-- snake_case for functions and variables
-- PascalCase for classes
-- Smart pointers mandatory (unique_ptr, shared_ptr)
-- No exceptions in hot paths
-- RAII for resource management
+### Pre-Commit Checklist
 
-### Python
+- [ ] The PR must reference a GitHub issue (if applicable) via `Fixes #123` or `Closes #456`
+- [ ] Test files updated and passing
+- [ ] Documentation updated where relevant
+- [ ] Code reviews complete (if applicable)
+- [ ] All CI checks passing before merge
 
-- PEP 8
-- Black formatter, 88 columns
-- Type hints required for all function signatures
-- Docstrings for public APIs
+### Code Quality Requirements
 
-## Prohibited
+- [ ] Compiles without warnings (`-Wall -Wextra -Wpedantic`)
+- [ ] All tests pass via ctest
+- [ ] Follows existing code style (see STYLEGUIDE.md)
+- [ ] Consistent with project conventions
 
-- GitHub pull requests (email patches only)
-- Discord or Slack discussions for technical decisions
-- Corporate contributor license agreements (CLAs)
-- AI-generated code without explicit human understanding and review
+### Documentation Standards
 
-## License
+- [ ] Include docstrings for all public functions
+- [ ] Document APIs in the official documentation
+- [ ] Update relevant user-facing documentation
 
-By contributing, you agree to license your work under the MIT License.
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+cd build && ctest -C Release --output-on-failure
+
+# Individual test categories
+ctest -C Release -R test_unicode   # Character encoding tests
+ctest -C Release -R test_crypto    # Crypto module tests
+ctest -C Release -R test_tensor    # Tensor engine tests
+ctest -C Release -R test_security  # Security module tests
+```
+
+### Test Coverage
+
+Project maintains comprehensive test coverage across:
+- Unit tests for all modules (C/C++/Rust)
+- Python test suite (300+ tests in tests/python/)
+- Benchmark tests (perf regression detection)
+- Security tests (fuzzing, validation)
+
+## Build & Run Local
+
+### Python Bindings
+
+```python
+from SneppX_ALG import Tensor, Linear, AdamW
+
+# Basic usage
+model = Linear(768, 10)
+optimizer = AdamW(model.parameters(), lr=0.001)
+```
+
+### C/C++ Integration
+
+```c
+#include "neural_core/tensor.h"
+
+// Create and manipulate tensors
+SNEPPX_Tensor* t = sneppx_tensor_create(2, 2);
+sneppx_tensor_free(t);
+```
+
+### Rust Bindings
+
+```rust
+use neural_core_algo::Tensor;
+
+fn main() {
+    let t = Tensor::new(vec![2, 2]);
+    let ones = Tensor::ones(vec![2, 3]);
+}
+```
+
+## Development Tools
+
+### Required Dependencies
+
+| Tool | Purpose |
+|------|---------|
+| CMake >= 3.16 | Build system |
+| GCC/Clang >= 7 | C/C++ compilation |
+| Python 3.9+ | Python bindings |
+| Rust >= 1.56 | Rust bindings |
+| CUDA >= 11.8 | GPU kernels (optional) |
+
+### Build Options
+
+```bash
+# Debug build with sanitizers
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSNEPPX_USE_SANITIZERS=ON
+
+# Release with Python bindings
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_PYTHON=ON
+
+# Release with CUDA support
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_CUDA=ON
+```
+
+## Package Publishing
+
+### Python Package
+
+```bash
+# Build sdist and wheel
+python -m build --wheel --sdist
+
+# Install locally
+pip install dist/sneppx_alg-0.9.5.748-py3-none-any.whl
+```
+
+### Rust Crates
+
+```bash
+# Package the workspace
+cargo package --allow-dirty
+
+# Add dependencies for publishing
+rustup target add x86_64-unknown-linux-gnu wasm32-unknown-unknown
+```
+
+## Licensing & Attribution
+
+### Contributor License Agreement (CLA)
+
+- No corporate CLAs - individual contributors only
+- All contributions under MIT License
+- Sign your commits with your GPG or Ed25519 key
+
+### Patent Grants
+
+These code contributions grant a perpetual, worldwide, royalty-free license under all patents held by the maintainer for those contributions.
+
+## Appendix
+
+### Supported Architectures
+
+- x86-64 (AVX2, AVX-512)
+- ARMv8-A (NEON)
+- CUDA (NVIDIA GPUs)
+- ROCm (AMD GPUs)
+
+### Performance Profile
+
+- **Tensor Engine**: 100% SIMD-optimized
+- **CPU**: Work-stealing scheduler with thread affinity
+- **GPU**: CUDA kernels for accelerated workloads
+- **Security**: S0-S9 security layers for defense-in-depth
+
+### Architecture Features
+
+- **Neural Architectures**: HSS, MoE, ARC, NPE, FM
+- **Security Layers**: Post-quantum crypto, obfuscation
+- **Distributed Training**: ZeRO, NCCL, RDMA
+- **Deployment**: ONNX, SafeTensors, PyTorch formats
+
+### API Overview
+
+- **C API**: Core tensor and security interfaces
+- **Python API**: High-level neural networks, training loops
+- **Rust API**: Memory-safe bindings for systems programming
+- **CLI Tools**: `sneppx-train`, `sneppx-serve`, `sneppx-experiment`
+
+### Future Priorities
+
+1. **Hardware**: TPU, NPU integration, more accelerators
+2. **Protocols**: QUIC, gRPC, HTTP/3 support
+3. **Compliance**: SOC 2, ISO certifications
+4. **AI Safety**: Federated learning, differential privacy
+
+## Quick Start (5-min guide)
+
+```bash
+# Clone & build
+mkdir sneppx-alg && cd sneppx-alg
+git clone https://github.com/ammar49-cyber/sneppx-alg.git .
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j$(nproc)
+
+# Test
+cd build && ctest -C Release --output-on-failure
+
+# Install Python package
+pip install -e bindings/python
+```
+
+Ready to contribute? Open an issue or directly make changes and submit a pull request!
+
+---
+
+**Questions?**
+Contact: algoSNEPPX@gmail.com
+
+**Documentation**: https://github.com/ammar49-cyber/sneppx-alg
+
+**GitHub**: https://github.com/ammar49-cyber/sneppx-alg
