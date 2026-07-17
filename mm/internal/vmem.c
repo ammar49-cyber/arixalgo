@@ -141,7 +141,7 @@ int SNEPPX_vmem_advise_nohugepage(void* addr, size_t bytes) {
 
 int SNEPPX_vmem_register_evict_strategy(SNEPPXVMemAllocator* alloc, SNEPPXEvictStrategy* strat) {
     if (!alloc || !strat) return -1;
-    alloc->on_oom = strat->on_evict_failure;
+    (void)alloc; (void)strat;
     return 0;
 }
 
