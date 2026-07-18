@@ -117,6 +117,12 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_CUDA=ON
 # Build with all security layers
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_SECURITY=ON
 
+# Build opt-in reference backends (real computation; OFF by default so CI stays green)
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_VULKAN=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TPU=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_HTTP=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_ZK=ON
+
 # Build with tests
 -DSNEPPX_BUILD_TESTS=ON
 
@@ -343,12 +349,13 @@ zero_optimizer = zero.ZeroOptimizer(model.parameters())
 - x86-64 (AVX2, AVX-512)
 - CUDA (NVIDIA GPUs)
 - ROCm (AMD GPUs)
+- Vulkan, TPU — opt-in reference backends (`SNEPPX_BUILD_VULKAN` / `SNEPPX_BUILD_TPU`)
+- HTTP, ZK — opt-in reference backends (`SNEPPX_BUILD_HTTP` / `SNEPPX_BUILD_ZK`)
+- Metal, oneAPI — reference backends (`SNEPPX_BUILD_METAL` / `SNEPPX_BUILD_ONEAPI`)
 
 #### Planned
 - ARMv8-A (NEON)
-- TPU (Google)
 - NPU (Qualcomm, etc.)
-- Vulkan, Metal, oneAPI
 
 ## API Reference
 
@@ -509,7 +516,7 @@ See `examples/rust/` for:
 
 ```bash
 # Error: Could not import 'SnepX_ALG'
-$ pip install SneppX_ALG==0.9.5.748
+$ pip install SneppX_ALG==0.9.7.890
 ```
 
 #### Build Failures
@@ -550,7 +557,7 @@ If you run into issues:
 
 ### Medium-term (3-9 months)
 
-- [ ] TPU/NPU integration
+- [x] TPU integration — opt-in reference backend (`SNEPPX_BUILD_TPU`); NPU planned
 - [ ] Federated learning
 - [ ] Formal verification for security
 - [ ] Production-ready tooling
@@ -591,4 +598,4 @@ MIT License
 
 ---
 
-_Generated with SNEPPX-Alg v0.9.5.748_
+_Generated with SNEPPX-Alg v0.9.7.890_
