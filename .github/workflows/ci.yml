@@ -54,7 +54,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake (opt-in backends)
-        run: cmake -B build_be -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON -DSNEPPX_BUILD_TOOLS=ON -DSNEPPX_BUILD_VULKAN=ON -DSNEPPX_BUILD_TPU=ON -DSNEPPX_BUILD_HTTP=ON -DSNEPPX_BUILD_ZK=ON
+        run: cmake -B build_be -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON -DSNEPPX_BUILD_TOOLS=ON -DSNEPPX_BUILD_VULKAN=ON -DSNEPPX_BUILD_TPU=ON -DSNEPPX_BUILD_HTTP=ON -DSNEPPX_BUILD_ZK=ON -DSNEPPX_BUILD_AMD=ON -DSNEPPX_BUILD_INTEL=ON -DSNEPPX_BUILD_QNN=ON -DSNEPPX_BUILD_NPU=ON -DSNEPPX_BUILD_SGX=ON -DSNEPPX_BUILD_SHIM=ON
 
       - name: Build
         run: cmake --build build_be --config Release --parallel
@@ -62,6 +62,20 @@ jobs:
       - name: Run C tests
         working-directory: build_be
         run: ctest -C Release --output-on-failure --timeout 120
+
+  l0-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Configure CMake (minimal, Release)
+        run: cmake -B build_l0 -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build_l0 --config Release --parallel
+      - name: Run L0 smoke tests
+        working-directory: build_l0
+        run: ctest -C Release -R "test_e2e_training_loop|test_gradient_flow|test_backend_full|test_cognitive_memory" --output-on-failure --timeout 60
 
   sanitizer:
     runs-on: ubuntu-latest
