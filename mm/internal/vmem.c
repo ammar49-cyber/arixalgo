@@ -13,6 +13,7 @@ void SNEPPX_vmem_init(SNEPPXVMemAllocator* alloc) {
     if (alloc) {
         memset(alloc, 0, sizeof(*alloc));
         alloc->page_size_default = 4096;
+        alloc->evict_strategy = NULL;
 #ifdef _WIN32
         SYSTEM_INFO si; GetSystemInfo(&si);
         alloc->page_size_default = (size_t)si.dwPageSize;
@@ -141,12 +142,20 @@ int SNEPPX_vmem_advise_nohugepage(void* addr, size_t bytes) {
 
 int SNEPPX_vmem_register_evict_strategy(SNEPPXVMemAllocator* alloc, SNEPPXEvictStrategy* strat) {
     if (!alloc || !strat) return -1;
-    (void)alloc; (void)strat;
+    alloc->evict_strategy = strat;
     return 0;
 }
 
 int SNEPPX_vmem_evict_page(SNEPPXVMemAllocator* alloc, void* addr, size_t size) {
     if (!alloc || !addr) return -1;
+    if (alloc->evict_strategy && alloc->evict_strategy->select_victim) {
+        void* victim_addr = NULL;
+        size_t victim_size = 0;
+        if (alloc->evict_strategy->select_victim(alloc->evict_strategy, &victim_addr, &victim_size) == 0
+            && victim_addr && victim_size > 0) {
+            return SNEPPX_vmem_decommit(alloc, victim_addr, victim_size);
+        }
+    }
     return SNEPPX_vmem_decommit(alloc, addr, size);
 }
 

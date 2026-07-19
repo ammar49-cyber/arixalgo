@@ -4,6 +4,15 @@ All notable changes to SNEPPX-Algo.
 
 ## [0.9.7.890] — 2026-07-18
 
+### Phase A — Eliminate last C stubs
+- **`mm/internal/vmem.c`**: `SNEPPX_vmem_register_evict_strategy` now stores the strategy
+  in the allocator (new field `evict_strategy`); `evict_page` delegates to the strategy's
+  `select_victim` callback when available.
+- **`algorithms/fm/core/forward_train.c`**: `SNEPPX_fm_get_params` now returns each node's
+  memory-bank values tensor as a trainable parameter; `SNEPPX_fm_build_train_graph` now
+  invokes `SNEPPX_fm_forward` and wraps the output in a `SNEPPXVariable`.
+- Build green (0 errors), 7/7 tests pass (test_vmem + 6 FM tests).
+
 ### Phase 1 — Format layer realisation & build hygiene
 - **Version bump to 0.9.7.890** across `VERSION`, `CMakeLists.txt`, `pyproject.toml`,
   `bindings/python/setup.py`, `Cargo.toml` (workspace), `net/distributed/Cargo.toml`,

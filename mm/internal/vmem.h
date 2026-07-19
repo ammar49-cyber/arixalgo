@@ -44,6 +44,7 @@ typedef struct SNEPPXVMemAllocator {
     size_t   peak_committed;
     size_t   page_size_default;
     int      (*on_oom)(size_t requested_bytes);
+    struct SNEPPXEvictStrategy* evict_strategy;
 } SNEPPXVMemAllocator;
 
 /* ---------- API ---------- */
