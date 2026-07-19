@@ -1,0 +1,31 @@
+#include "neural_core/drivers/driver_status.h"
+#include "qualcomm_driver.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+static int pass = 0, fail = 0;
+#define CHECK(c, m) do { if (!(c)) { printf("FAIL: %s\n", m); fail++; } else { pass++; } } while (0)
+
+int main(void) {
+    int r = SNEPPX_qualcomm_register();
+    if (r == SNEPPX_DRIVER_OK) {
+        int cnt = 0;
+        CHECK(SNEPPX_qualcomm_get_device_count(&cnt) == SNEPPX_DRIVER_OK && cnt >= 1, "qnn device count");
+        char name[64]; unsigned long long mem = 0;
+        CHECK(SNEPPX_qualcomm_get_device_props(0, name, sizeof(name), &mem) == SNEPPX_DRIVER_OK, "qnn device props");
+        void* ctx = SNEPPX_qualcomm_create_context("model.sneppx");
+        CHECK(ctx != NULL, "qnn create context");
+        float data[4] = { -1.0f, 0.5f, -2.0f, 3.0f };
+        CHECK(SNEPPX_qualcomm_set_input(ctx, "input", data, 4) == SNEPPX_DRIVER_OK, "qnn set input");
+        CHECK(SNEPPX_qualcomm_run_inference(ctx) == SNEPPX_DRIVER_OK, "qnn run inference");
+        float out[4] = {0};
+        CHECK(SNEPPX_qualcomm_get_output(ctx, "output", out, 4) == SNEPPX_DRIVER_OK, "qnn get output");
+        CHECK(out[0] == 0.0f && out[3] == 3.0f, "qnn relu-like inference");
+        SNEPPX_qualcomm_destroy_context(ctx);
+    } else {
+        CHECK(r == SNEPPX_DRIVER_UNSUPPORTED, "qnn reports unsupported");
+    }
+    printf("%d passed, %d failed\n", pass, fail);
+    return fail > 0 ? 1 : 0;
+}

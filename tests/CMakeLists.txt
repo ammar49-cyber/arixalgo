@@ -39,6 +39,12 @@ macro(add_neural_test test_src link_libs)
         ${CMAKE_SOURCE_DIR}/drivers/tpu
         ${CMAKE_SOURCE_DIR}/drivers/http
         ${CMAKE_SOURCE_DIR}/drivers/zk
+        ${CMAKE_SOURCE_DIR}/drivers/amd
+        ${CMAKE_SOURCE_DIR}/drivers/intel
+        ${CMAKE_SOURCE_DIR}/drivers/qualcomm
+        ${CMAKE_SOURCE_DIR}/drivers/npu
+        ${CMAKE_SOURCE_DIR}/drivers/sgx
+        ${CMAKE_SOURCE_DIR}/drivers/shim
     )
     add_test(NAME ${test_name} COMMAND ${test_name})
     endif()
