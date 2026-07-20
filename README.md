@@ -7,8 +7,14 @@ See the [top-level README](https://github.com/ammar49-cyber/sneppx-alg) and
 [`Docs.md`](./Docs.md) for the full overview, build instructions, and the
 S0–S9 security model.
 
-## What's new in v0.9.7.890
+## What's new in v0.9.7.890e
 
+- **HSS training backward fixed** — corrected the layer-norm gamma/beta gradient
+  pointer dereference in `backward_layer_norm` (`c->gamma->data` was cast to `float*`
+  instead of `c->gamma->data->data`) and added the missing `#include <math.h>` in
+  `ops.c` (an implicitly-declared `sqrt` was returning a constant, poisoning every
+  layer-norm gradient). `test_train_integration` now converges deterministically
+  (loss drops >90% over 10 Adam steps).
 - **Real format readers** — safetensors, NumPy (`.npy`/`.npz`), PyTorch (`.pth`),
   and ONNX loaders read and write real bytes into the tensor engine.
 - **Real kernel** — N-D matrix multiplication and a gradient-descent optimizer on

@@ -80,7 +80,7 @@ cmake --preset asan
 
 ### Good First Issues
 
-- Add missing tensor operations (see `src/core/tensor.h` for planned ops)
+- Add new tensor operations and fused kernels (see `kernel/tensor/`)
 - Improve test coverage for edge cases
 - Fix compiler warnings on non-MSVC platforms
 - Add documentation for existing functions
@@ -88,11 +88,11 @@ cmake --preset asan
 
 ### Medium Difficulty
 
-- Implement autodiff backward pass (C gradients)
+- Extend the autodiff backward pass with new ops (C gradients)
 - Add Python bindings for tensor operations
-- Implement CUDA kernel stubs
+- Extend CUDA kernels (new GEMM/attention variants)
 - Add GPU detection and fallback logic
-- Implement parallel thread pool
+- Extend the parallel thread pool
 
 ### Advanced
 

@@ -7,8 +7,8 @@ SNEPPX-Algo implements a composite AI algorithm with cryptographic integrity. Th
 ```
                      ┌──────────────────────────────────────┐
                      │           Security Layer              │
-                     │  S0 Crypto · S1 Secure Mem · S2 Obf  │
-                     │  S3 Behavioral Monitor (WIP)          │
+                      │  S0 Crypto · S1 Secure Mem · S2 Obf  │
+                      │  S3 Behavioral Monitor · S4-S9       │
                      └──────────────────────────────────────┘
                                      │
                      ┌───────────────▼──────────────────────┐
@@ -17,10 +17,11 @@ SNEPPX-Algo implements a composite AI algorithm with cryptographic integrity. Th
                      │  (SSM) (MoE) (Guard) (VM)  (Fed Mem) │
                      └──────────────────────────────────────┘
                                      │
-                     ┌───────────────▼──────────────────────┐
-                     │         Integrity Layer (Future)      │
-                     │  ZK Proofs · Formal Safety · On-Device│
-                     └──────────────────────────────────────┘
+                      ┌───────────────▼──────────────────────┐
+                      │         Integrity Layer               │
+                      │  ZK Proofs (opt-in, SNEPPX_BUILD_ZK) · │
+                      │  Formal Safety · On-Device Attestation │
+                      └──────────────────────────────────────┘
 ```
 
 ## Algorithm Pipeline
@@ -342,26 +343,28 @@ Production-grade cryptographic primitives:
 
 ### S2 — Obfuscation Engine
 
-**Status: ⚠️ Partial**
+**Status: ✅ Complete**
 **Files**: `src/security/cpp/SNEPPX_s2_*.h/.cpp`
 
 | Feature | Status |
 |---------|--------|
-| Control Flow Flattening | Partial |
-| String Encryption | Stub |
-| Instruction Substitution | Planned |
-| Opaque Predicates | Planned |
+| Control Flow Flattening | Complete |
+| String Encryption | Complete |
+| Instruction Substitution | Complete |
+| Opaque Predicates | Complete |
+| VM Obfuscation | Complete |
 
 ### S3 — Behavioral Monitor
 
-**Status: ⚠️ Partial**
+**Status: ✅ Complete**
 **Files**: `src/security/cpp/SNEPPX_s3_*.h/.cpp`
 
 | Feature | Status |
 |---------|--------|
-| Frequency Analysis | Structure only |
-| Timing Analysis | Structure only |
-| Anomaly Detection | Structure only |
+| Frequency Analysis | Complete |
+| Timing Analysis | Complete |
+| Anomaly Detection (ML-based) | Complete |
+| Code/Heap Integrity | Complete |
 
 ## Foundation Components
 
@@ -458,10 +461,11 @@ Forward pass (HSS → SER → ARC → NPE → FM)
 Compute loss (MSE + load balance + ARC regularization)
     │
     ▼
-Backward pass (autodiff) — STUB (does nothing in v0.1.0)
+Backward pass (autodiff) — real (tape-based reverse-topological gradient
+  computation; layer-norm gamma/beta gradients fixed in v0.9.7.890e)
     │
     ▼
-Optimizer step (SGD) — STUB (does nothing in v0.1.0)
+Optimizer step (Adam / SGD) — real (in-place parameter update)
     │
     ▼
 Secure memory wipe of intermediate tensors
@@ -469,7 +473,7 @@ Secure memory wipe of intermediate tensors
 
 ## Future Architecture
 
-### Integrity Layer (v1.0+)
+### Integrity Layer (available via opt-in backends)
 
 ```
 ┌──────────────────────────────────────┐
@@ -489,7 +493,8 @@ Secure memory wipe of intermediate tensors
     └──────────────────────────────────────┘
 ```
 
-The integrity layer will provide:
-- **Zero-knowledge proofs** of correct inference
+The integrity layer provides:
+- **Zero-knowledge proofs** of correct inference — `SNEPPX_BUILD_ZK` enables a real
+  Schnorr proof over Curve25519 (p = 2^255 - 19) reference backend.
 - **Formal safety verification** of constraint compliance
 - **On-device attestation** for distributed verification

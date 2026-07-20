@@ -43,7 +43,7 @@ cmake --build . -j$(nproc)
                      ┌──────────────────────────────────────┐
                      │           Security Layer              │
                      │  S0 Crypto · S1 Secure Mem · S2 Obf  │
-                     │  S3 Behavioral Monitor (WIP)          │
+                      │  S3 Behavioral Monitor · S4-S9       │
                      └──────────────────────────────────────┘
                                      │
                      ┌───────────────▼──────────────────────┐
@@ -52,17 +52,18 @@ cmake --build . -j$(nproc)
                      │  (SSM) (MoE) (Guard) (VM)  (Fed Mem) │
                      └──────────────────────────────────────┘
                                      │
-                     ┌───────────────▼──────────────────────┐
-                     │         Integrity Layer (Future)      │
-                     │  ZK Proofs · Formal Safety · On-Device│
-                     └──────────────────────────────────────┘
+                      ┌───────────────▼──────────────────────┐
+                      │         Integrity Layer               │
+                      │  ZK Proofs (opt-in) · Formal Safety ·  │
+                      │  On-Device Attestation                │
+                      └──────────────────────────────────────┘
 ```
 
 ## Component Descriptions
 
 ### HSS — Hierarchical State Space
 
-Multi-layer state space model with zero-order hold discretization. Processes sequences in O(n log n) time using a parallel scan over the state dimension. Supports hierarchical decomposition for long-range dependencies.
+Multi-layer state space model with zero-order hold discretization. Processes sequences timestep-by-timestep (a parallel scan over the state dimension is planned for the CUDA path). Supports hierarchical decomposition for long-range dependencies. Training through the autodiff tape is supported (see `docs/hss_training.md`).
 
 - `docs/architecture.md` for mathematical details
 - `src/arch/src/hss/` for implementation
@@ -103,22 +104,22 @@ Per-node memory banks with euclidean similarity search and LRU eviction. Support
 ## Status Table
 
 | Component | Lines | Tests | Status |
-|-----------|-------|-------|--------|
+|-----------|-------|--------|
 | Tensor Core | ~2,000 | 57+27 edge | ✅ Real |
 | Memory | ~800 | 13 | ✅ Real |
-| Thread Pool | ~300 | 11 | ⚠️ Stub |
-| HSS | ~500 | 2 | ⚠️ Partial |
-| SER | ~600 | 5 | ⚠️ Partial |
-| ARC | ~600 | 5 | ⚠️ Partial |
-| NPE | ~700 | 4 | ⚠️ Partial |
-| FM | ~600 | 4 | ⚠️ Partial |
-| Autodiff | ~400 | 1 | ❌ Stub |
-| Optimizer | ~300 | 1 | ❌ Stub |
-| Python API | ~500 | 3 | ❌ Stub |
+| Thread Pool | ~300 | 11 | ✅ Real |
+| HSS | ~500 | 2 + integration | ✅ Real (training works) |
+| SER | ~600 | 5 | ✅ Real |
+| ARC | ~600 | 5 | ✅ Real |
+| NPE | ~700 | 4 | ✅ Real |
+| FM | ~600 | 4 | ✅ Real |
+| Autodiff | ~400 | tape backward | ✅ Real (layer-norm fixed in v0.9.7.890e) |
+| Optimizer | ~300 | 1 | ✅ Real (Adam/SGD) |
+| Python API | ~500 | 3 | ✅ Real |
 | S0 Crypto | ~2,000 | 10 | ✅ Real |
 | S1 Secure Mem | ~800 | 3 | ✅ Real |
-| S2 Obfuscation | ~1,500 | 4 | ⚠️ Partial |
-| S3 Monitor | ~100 | 0 | ⚠️ Partial |
+| S2 Obfuscation | ~1,500 | 4 | ✅ Complete |
+| S3 Monitor | ~100 | 0 | ✅ Complete |
 
 ## Directory Structure
 
@@ -157,6 +158,9 @@ SneppX_ALG/
 ## Next Steps
 
 - Read [docs/architecture.md](architecture.md) for deep technical details
+- Read [docs/hss_training.md](hss_training.md) for an end-to-end HSS training walkthrough
+- Read [docs/release_notes/v0.9.7.890e.md](release_notes/v0.9.7.890e.md) for the v0.9.7.890e release notes
+- Read [docs/migration/v0.9.7.890e.md](migration/v0.9.7.890e.md) for the upgrade guide
 - Read [docs/roadmap.md](roadmap.md) for the project timeline
 - Read [docs/installation.md](installation.md) for platform-specific build guides
 - Read [docs/api/c.md](api/c.md) for the C API reference

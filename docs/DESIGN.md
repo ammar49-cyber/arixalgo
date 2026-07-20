@@ -93,9 +93,9 @@ S0: Crypto primitives (Ed25519, ChaCha20-Poly1305, SHA-3, BLAKE3)
 S1: Secure memory (guard pages, canaries, ASLR, locked memory)
 S2: Obfuscation (control flow, string encryption, instruction substitution)
 S3: Behavioral monitoring (anomaly detection, API hooking)
-S4: Network security (planned v0.5.0)
-S5: AI sanitizer (planned v0.5.0)
-S6-S9: Advanced (planned v1.0+)
+S4: Network security (complete — TLS 1.3, Noise, QUIC, mTLS, DoH, WireGuard, NIDS)
+S5: AI sanitizer (complete — semantic injection, jailbreak, model-inversion, watermarking)
+S6-S9: Advanced (complete — key vault, secure updates, formal verification, pentest)
 ```
 
 Every component includes defensive measures appropriate to its role:

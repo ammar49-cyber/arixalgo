@@ -165,7 +165,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_CUDA=ON
 python -m build --wheel --sdist
 
 # Install locally
-pip install dist/sneppx_alg-0.9.5.748-py3-none-any.whl
+pip install dist/sneppx_alg-0.9.7.890e-py3-none-any.whl
 ```
 
 ### Rust Crates

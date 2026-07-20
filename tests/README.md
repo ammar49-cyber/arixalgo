@@ -222,7 +222,7 @@ jobs:
           cd build && ctest -C Release --output-on-failure
 ```
 
-### Current Status (v0.9.5.748)
+### Current Status (v0.9.7.890e)
 
 | Component | Test Count | Pass Rate | CI Status |
 |-----------|------------|-----------|-----------|

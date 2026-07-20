@@ -26,20 +26,20 @@ import SneppX_ALG as ax
 t = ax.Tensor.randn((4, 8, 16), dtype=ax.float32)
 ```
 
-## Components (v0.1.0)
+## Components (v0.9.7.890e)
 
 | Component | Module | Status |
 |-----------|--------|--------|
 | Tensor | `ax.Tensor` `ax.tensor.*` | ✅ Creation, ops, reductions, IO, NN |
-| Autodiff | `ax.Variable` `ax.Tape` | ⚠️ Forward only, backward is stub |
-| Optimizer | `ax.SGD` `ax.Adam` | ⚠️ Forward step only |
-| HSS | `ax.HSSModel` | ✅ Forward pass |
+| Autodiff | `ax.Variable` `ax.Tape` | ✅ Forward + backward (real autodiff tape; layer-norm gamma/beta gradient fixed in v0.9.7.890e) |
+| Optimizer | `ax.SGD` `ax.Adam` | ✅ SGD / Adam step |
+| HSS | `ax.HSSModel` | ✅ Forward + training (`test_train_integration` converges deterministically) |
 | SER | `ax.SERModel` | ✅ Forward pass |
 | ARC | `ax.ARCModel` | ✅ Forward pass |
 | NPE | `ax.NPEModel` | ✅ Compile + execute |
 | FM | `ax.FMModel` | ✅ Read/write/sync |
-| Trainer | `ax.Trainer` | ⚠️ Training loop stub |
-| Security | `ax.s0` `ax.s1` | ✅ S0 crypto, S1 secure memory |
+| Trainer | `ax.Trainer` | ✅ Training loop (tape backward + optimizer step) |
+| Security | `ax.s0`–`ax.s9` | ✅ S0–S9 complete |
 
 ## Environment Setup
 

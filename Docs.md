@@ -516,7 +516,7 @@ See `examples/rust/` for:
 
 ```bash
 # Error: Could not import 'SnepX_ALG'
-$ pip install SneppX_ALG==0.9.7.890
+$ pip install SneppX_ALG==0.9.7.890e
 ```
 
 #### Build Failures
@@ -598,4 +598,4 @@ MIT License
 
 ---
 
-_Generated with SNEPPX-Alg v0.9.7.890_
+_Generated with SNEPPX-Alg v0.9.7.890e_

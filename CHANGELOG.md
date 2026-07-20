@@ -2,7 +2,18 @@
 
 All notable changes to SNEPPX-Algo.
 
-## [0.9.7.890] — 2026-07-18
+## [0.9.7.890e] — 2026-07-18
+
+### Patch — HSS backward corruption fix
+- Fixed `backward_layer_norm` in `kernel/autodiff/ops.c`: `c->gamma->data` (a tensor)
+  was cast to `float*` instead of `c->gamma->data->data`, yielding garbage layer-norm
+  gains and exploding gradients downstream. Same fix applied to the beta gradient path.
+- Added the missing `#include <math.h>` in `ops.c`. Without it, `sqrt` was implicitly
+  declared (assumed `int` return) and returned a constant `-256.0`, corrupting `inv_std`
+  and every layer-norm gradient.
+- Removed all debug instrumentation used during diagnosis (`ops.c`, `tape.c`, test).
+- Result: `tests/unit/test_train_integration` now converges deterministically
+  (loss ↓ >90% over 10 Adam steps); verified 15/15 Release runs.
 
 ### Phase B — Populate 4 kernel directories
 - **`kernel/activations/`**: `activations.c` (ReLU, LeakyReLU, PReLU, ELU, SELU, GELU
@@ -27,7 +38,7 @@ All notable changes to SNEPPX-Algo.
 - Build green (0 errors), 7/7 tests pass (test_vmem + 6 FM tests).
 
 ### Phase 1 — Format layer realisation & build hygiene
-- **Version bump to 0.9.7.890** across `VERSION`, `CMakeLists.txt`, `pyproject.toml`,
+- **Version bump to 0.9.7.890e** across `VERSION`, `CMakeLists.txt`, `pyproject.toml`,
   `bindings/python/setup.py`, `Cargo.toml` (workspace), `net/distributed/Cargo.toml`,
   and `lib/rust/Cargo.toml`.
 - **Opt-in CMake backend flags** added (all OFF by default): `SNEPPX_BUILD_VULKAN`,

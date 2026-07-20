@@ -18,8 +18,8 @@ ctest -R "test_arc|test_ser"       # ARC + SER tests
 | `tests/unit/` | Per-component unit tests |
 | `tests/integration/` | Multi-component integration tests |
 | `tests/benchmark/` | Performance benchmarks |
-| `tests/security/` | S0-S3 crypto and security tests |
-| `tests/fuzz/` | Fuzz harnesses (planned) |
+| `tests/security/` | S0-S9 crypto and security tests |
+| `tests/fuzz/` | Fuzz harnesses (libFuzzer/AFL-style corpus under `security/fuzzing/corpus/`) |
 
 ## Adding a Test
 
