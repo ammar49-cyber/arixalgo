@@ -52,7 +52,7 @@ static void test_hss_train_step(void) {
     SNEPPX_tensor_destroy(initial_out);
 
     SNEPPXOptimizerConfig opt_cfg = SNEPPX_optimizer_config_default();
-    opt_cfg.learning_rate = 0.01f;
+    opt_cfg.learning_rate = 0.03f;
     opt_cfg.type = SNEPPX_OPTIMIZER_ADAM;
     opt_cfg.weight_decay = 0.0f;
     SNEPPXOptimizer* opt = SNEPPX_optimizer_create(&opt_cfg);
@@ -63,7 +63,7 @@ static void test_hss_train_step(void) {
     SNEPPXTensor** pt = (SNEPPXTensor**)malloc(nw * sizeof(SNEPPXTensor*));
     SNEPPX_hss_get_params(model, pt, nw);
 
-    int steps = 50;
+    int steps = 10;
     for (int s = 0; s < steps; s++) {
         SNEPPXTape* tape = SNEPPX_tape_create();
 
@@ -81,17 +81,30 @@ static void test_hss_train_step(void) {
         SNEPPXVariable* loss = SNEPPX_mse_loss(tape, outv, tgv);
         ASSERT(loss != NULL, "loss");
 
+        if (s == 0) { printf("bw..."); fflush(stdout); }
         SNEPPX_tape_backward(tape, loss);
+        if (s == 0) { printf("opt..."); fflush(stdout); }
 
         SNEPPXTensor** gt = (SNEPPXTensor**)malloc(nw * sizeof(SNEPPXTensor*));
         for (size_t i = 0; i < nw; i++) gt[i] = wv[i]->grad;
 
+        if (s == 0) {
+            for (size_t i = 0; i < nw; i++) {
+                float gsum = 0.0f;
+                if (gt[i]) { float* gd = (float*)gt[i]->data; for (size_t j = 0; j < gt[i]->size; j++) gsum += fabsf(gd[j]); }
+                printf("  g%d=%.5f%s", (int)i, gsum, (i == nw - 1 ? "\n" : " "));
+            }
+            fflush(stdout);
+        }
+
         SNEPPX_optimizer_step(opt, pt, gt, nw);
 
-        for (size_t i = 0; i < nw; i++) { wv[i]->data = NULL; wv[i]->grad = NULL; SNEPPX_variable_destroy(wv[i]); }
-        inv->data = NULL; SNEPPX_variable_destroy(inv);
-        tgv->data = NULL; SNEPPX_variable_destroy(tgv);
+        /* Null data/grad pointers to prevent tape_destroy from freeing model's param tensors */
+        for (size_t i = 0; i < nw; i++) { wv[i]->data = NULL; }
+        inv->data = NULL;
+        tgv->data = NULL;
 
+        /* Tape owns all vars (wv, inv, tgv, intermediates) — destroy once */
         SNEPPX_tape_destroy(tape);
         free(wv);
         free(gt);

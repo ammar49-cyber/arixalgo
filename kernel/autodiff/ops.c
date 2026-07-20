@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <math.h>
 
 /* ---------- internal helpers ---------- */
 static int requires_grad(SNEPPXVariable* a, SNEPPXVariable* b) {
@@ -1148,8 +1150,7 @@ static void backward_layer_norm(void* ctx, SNEPPXTensor* grad_output) {
     size_t d = c->a->data->shape[c->a->data->ndim - 1];
     size_t n = c->a->data->size / d;
     float* xd = (float*)c->a->data->data;
-    float* gd = (float*)c->gamma->data;
-    float* bd = c->beta ? (float*)c->beta->data : NULL;
+    float* gd = c->gamma ? (float*)c->gamma->data->data : NULL;
     float* go = (float*)grad_output->data;
     float eps = c->eps;
     if (c->a->requires_grad) {
@@ -1332,6 +1333,7 @@ typedef struct { SNEPPXVariable** vars; size_t num_vars; size_t dim; size_t* siz
 static void free_ctx_ConcatCtx(void* p) {
     ConcatCtx* c = (ConcatCtx*)p;
     if (c->sizes) SNEPPX_free(c->sizes, c->num_vars * sizeof(size_t));
+    if (c->vars) SNEPPX_free(c->vars, c->num_vars * sizeof(SNEPPXVariable*));
     SNEPPX_free(p, sizeof(ConcatCtx));
 }
 static void* recompute_ConcatCtx(SNEPPXVariable* var, size_t* params, size_t n) {
@@ -1347,8 +1349,10 @@ static void* recompute_ConcatCtx(SNEPPXVariable* var, size_t* params, size_t n) 
 }
 static void backward_concat(void* ctx, SNEPPXTensor* grad_output) {
     ConcatCtx* c = (ConcatCtx*)ctx;
+    if (!c) return;
     size_t offset = 0;
     for (size_t i = 0; i < c->num_vars; i++) {
+        if (!c->vars[i]) break;
         if (!c->vars[i]->requires_grad) { offset += c->sizes ? c->sizes[i] : c->vars[i]->data->shape[c->dim]; continue; }
         size_t sz = c->sizes ? c->sizes[i] : c->vars[i]->data->shape[c->dim];
         SNEPPXTensor* slice = SNEPPX_tensor_narrow(grad_output, c->dim, offset, sz);
@@ -1376,7 +1380,9 @@ SNEPPXVariable* SNEPPX_concat(SNEPPXTape* tape, SNEPPXVariable** vars, size_t nu
     if (rg && !SNEPPX_no_grad_is_active()) {
         ConcatCtx* ctx = (ConcatCtx*)SNEPPX_malloc(sizeof(ConcatCtx), 64);
         if (ctx) {
-            ctx->vars = vars; ctx->num_vars = num_vars; ctx->dim = dim;
+            ctx->vars = (SNEPPXVariable**)SNEPPX_malloc(num_vars * sizeof(SNEPPXVariable*), 64);
+            if (ctx->vars) memcpy(ctx->vars, vars, num_vars * sizeof(SNEPPXVariable*));
+            ctx->num_vars = num_vars; ctx->dim = dim;
             ctx->sizes = (size_t*)SNEPPX_malloc(num_vars * sizeof(size_t), 64);
             if (ctx->sizes)
                 for (size_t i = 0; i < num_vars; i++) ctx->sizes[i] = vars[i]->data->shape[dim];

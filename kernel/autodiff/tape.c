@@ -5,7 +5,6 @@
 #include <math.h>
 #include <stdio.h>
 
-
 SNEPPXTape* SNEPPX_tape_create(void) {
     SNEPPXTape* tape = (SNEPPXTape*)SNEPPX_malloc(sizeof(SNEPPXTape), 64);
     if (!tape) return NULL;

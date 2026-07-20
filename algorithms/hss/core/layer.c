@@ -64,7 +64,7 @@ SNEPPXHSSLayer* SNEPPX_hss_layer_create(const SNEPPXHSSConfig* config, unsigned 
     layer->C = SNEPPX_tensor_create(shape_os, 2, SNEPPX_FLOAT32);
     layer->D = SNEPPX_tensor_create(shape_oi, 2, SNEPPX_FLOAT32);
     layer->dt = SNEPPX_tensor_create(shape_s1, 1, SNEPPX_FLOAT32);
-    layer->h = SNEPPX_tensor_create(shape_s1, 1, SNEPPX_FLOAT32);
+    layer->h = SNEPPX_tensor_zeros(shape_s1, 1, SNEPPX_FLOAT32);
     layer->x_proj = SNEPPX_tensor_create(shape_ii, 2, SNEPPX_FLOAT32);
     layer->x_proj_bias = SNEPPX_tensor_create(shape_i1, 1, SNEPPX_FLOAT32);
 
@@ -80,6 +80,8 @@ SNEPPXHSSLayer* SNEPPX_hss_layer_create(const SNEPPXHSSConfig* config, unsigned 
         }
 
         fill_randn(layer->x_proj, &state, 0.02f);
+        fill_randn(layer->D, &state, 0.1f);
+        fill_randn(layer->x_proj_bias, &state, 0.01f);
     }
 
     layer->A_bar = NULL;
