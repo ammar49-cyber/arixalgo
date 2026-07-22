@@ -15,7 +15,8 @@ int SNEPPX_ser_build_train_graph(SNEPPXSERModel* model, SNEPPXTape* tape,
     size_t E = model->config.expert_dim;
     size_t O = model->config.output_dim;
     size_t N = model->config.num_experts;
-    size_t wp_layer = 2 + 4 * N;
+    size_t gater_extra = model->config.use_mlp_gater ? 4 : 0;
+    size_t wp_layer = 2 + gater_extra + 4 * N;
     size_t total_layers = model->num_layers;
 
     if (num_weights < total_layers * wp_layer) return -1;
@@ -27,6 +28,14 @@ int SNEPPX_ser_build_train_graph(SNEPPXSERModel* model, SNEPPXTape* tape,
     for (size_t l = 0; l < total_layers; l++) {
         SNEPPXVariable* router = weight_vars[wi++];
         SNEPPXVariable* router_bias = weight_vars[wi++];
+
+        SNEPPXVariable* gw1 = NULL, *gb1 = NULL, *gw2 = NULL, *gb2 = NULL;
+        if (model->config.use_mlp_gater) {
+            gw1 = weight_vars[wi++];
+            gb1 = weight_vars[wi++];
+            gw2 = weight_vars[wi++];
+            gb2 = weight_vars[wi++];
+        }
 
         SNEPPXVariable** w1 = (SNEPPXVariable**)SNEPPX_malloc(N * sizeof(SNEPPXVariable*), 64);
         SNEPPXVariable** b1 = (SNEPPXVariable**)SNEPPX_malloc(N * sizeof(SNEPPXVariable*), 64);
@@ -48,7 +57,17 @@ int SNEPPX_ser_build_train_graph(SNEPPXSERModel* model, SNEPPXTape* tape,
         }
 
         SNEPPXVariable* router_T = SNEPPX_transpose(tape, router, 0, 1);
-        SNEPPXVariable* logits = SNEPPX_matmul(tape, cur_input, router_T);
+        SNEPPXVariable* logits;
+        if (model->config.use_mlp_gater) {
+            SNEPPXVariable* hidden = SNEPPX_matmul(tape, cur_input, gw1);
+            hidden = SNEPPX_add(tape, hidden, gb1);
+            hidden = SNEPPX_relu(tape, hidden);
+            SNEPPXVariable* gater_T = SNEPPX_transpose(tape, gw2, 0, 1);
+            logits = SNEPPX_matmul(tape, hidden, gater_T);
+            logits = SNEPPX_add(tape, logits, gb2);
+        } else {
+            logits = SNEPPX_matmul(tape, cur_input, router_T);
+        }
         SNEPPXVariable* gate = SNEPPX_softmax(tape, logits, 1);
 
         size_t ones_shape[] = {1, O};

@@ -25,6 +25,8 @@ typedef struct {
     SNEPPXTopKMethod top_k_method;
     float load_balance_coef;
     float dropout_rate;
+    int use_mlp_gater;
+    size_t gater_hidden_dim;
 } SNEPPXSERConfig;
 
 typedef struct {
@@ -39,6 +41,10 @@ typedef struct {
     SNEPPXExpert** experts;
     SNEPPXTensor* router;
     SNEPPXTensor* router_bias;
+    SNEPPXTensor* gater_w1;
+    SNEPPXTensor* gater_b1;
+    SNEPPXTensor* gater_w2;
+    SNEPPXTensor* gater_b2;
     SNEPPXSERConfig config;
     size_t expert_capacity;
 } SNEPPXSERLayer;
@@ -57,6 +63,7 @@ void SNEPPX_ser_layer_destroy(SNEPPXSERLayer* layer);
 SNEPPXSERModel* SNEPPX_ser_model_create(const SNEPPXSERConfig* config, unsigned int seed, size_t num_layers);
 void SNEPPX_ser_model_destroy(SNEPPXSERModel* model);
 void SNEPPX_ser_route(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** gate_weights, int** expert_indices);
+void SNEPPX_ser_route_mlp_gated(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** gate_weights, int** expert_indices);
 void SNEPPX_ser_gate_forward(const SNEPPXSERLayer* layer, const SNEPPXTensor* input,
                            SNEPPXTensor** gate_weights, int** expert_indices,
                            SNEPPXTensor** gate_logits, float temperature);

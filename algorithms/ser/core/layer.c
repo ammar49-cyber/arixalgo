@@ -43,6 +43,33 @@ SNEPPXSERLayer* SNEPPX_ser_layer_create(const SNEPPXSERConfig* config, unsigned 
         }
     }
 
+    if (config->use_mlp_gater) {
+        size_t gs[] = {config->input_dim, config->gater_hidden_dim};
+        size_t gs2[] = {config->gater_hidden_dim, config->num_experts};
+        size_t gs1[] = {config->gater_hidden_dim};
+        size_t gs3[] = {config->num_experts};
+        layer->gater_w1 = SNEPPX_tensor_create(gs, 2, SNEPPX_FLOAT32);
+        layer->gater_b1 = SNEPPX_tensor_zeros(gs1, 1, SNEPPX_FLOAT32);
+        layer->gater_w2 = SNEPPX_tensor_create(gs2, 2, SNEPPX_FLOAT32);
+        layer->gater_b2 = SNEPPX_tensor_zeros(gs3, 1, SNEPPX_FLOAT32);
+        if (layer->gater_w1 && layer->gater_w1->data) {
+            unsigned long gs = seed + 7777;
+            float* d = (float*)layer->gater_w1->data;
+            for (size_t i = 0; i < layer->gater_w1->size; i++) {
+                gs = gs * 1103515245UL + 12345UL;
+                d[i] = ((float)((gs >> 16) & 0x7FFF) / 32767.0f - 0.5f) * 0.1f;
+            }
+        }
+        if (layer->gater_w2 && layer->gater_w2->data) {
+            unsigned long gs = seed + 8888;
+            float* d = (float*)layer->gater_w2->data;
+            for (size_t i = 0; i < layer->gater_w2->size; i++) {
+                gs = gs * 1103515245UL + 12345UL;
+                d[i] = ((float)((gs >> 16) & 0x7FFF) / 32767.0f - 0.5f) * 0.01f;
+            }
+        }
+    }
+
     layer->expert_capacity = (config->input_dim * 2) / config->num_experts;
     if (layer->expert_capacity < 1) layer->expert_capacity = 1;
 
@@ -57,5 +84,9 @@ void SNEPPX_ser_layer_destroy(SNEPPXSERLayer* layer) {
     SNEPPX_free(layer->experts, layer->config.num_experts * sizeof(SNEPPXExpert*));
     if (layer->router) SNEPPX_tensor_destroy(layer->router);
     if (layer->router_bias) SNEPPX_tensor_destroy(layer->router_bias);
+    if (layer->gater_w1) SNEPPX_tensor_destroy(layer->gater_w1);
+    if (layer->gater_b1) SNEPPX_tensor_destroy(layer->gater_b1);
+    if (layer->gater_w2) SNEPPX_tensor_destroy(layer->gater_w2);
+    if (layer->gater_b2) SNEPPX_tensor_destroy(layer->gater_b2);
     SNEPPX_free(layer, sizeof(SNEPPXSERLayer));
 }

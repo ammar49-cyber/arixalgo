@@ -257,6 +257,8 @@ static void init_optim_model(py::module& m) {
         .def_readwrite("top_k_method", &SNEPPXSERConfig::top_k_method)
         .def_readwrite("load_balance_coef", &SNEPPXSERConfig::load_balance_coef)
         .def_readwrite("dropout_rate", &SNEPPXSERConfig::dropout_rate)
+        .def_readwrite("use_mlp_gater", &SNEPPXSERConfig::use_mlp_gater)
+        .def_readwrite("gater_hidden_dim", &SNEPPXSERConfig::gater_hidden_dim)
         .def("default", &SNEPPX_ser_config_default);
 
     py::class_<SNEPPXARCConfig>(m, "SNEPPXARCConfig")

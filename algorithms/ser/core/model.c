@@ -42,6 +42,12 @@ size_t SNEPPX_ser_get_params(const SNEPPXSERModel* model, SNEPPXTensor** out, si
         count++;
         if (out && count < max_out) out[count] = layer->router_bias;
         count++;
+        if (layer->config.use_mlp_gater) {
+            if (out && count < max_out) out[count] = layer->gater_w1; count++;
+            if (out && count < max_out) out[count] = layer->gater_b1; count++;
+            if (out && count < max_out) out[count] = layer->gater_w2; count++;
+            if (out && count < max_out) out[count] = layer->gater_b2; count++;
+        }
         for (size_t e = 0; e < model->config.num_experts; e++) {
             SNEPPXExpert* exp = layer->experts[e];
             if (out && count < max_out) out[count] = exp->w1; count++;

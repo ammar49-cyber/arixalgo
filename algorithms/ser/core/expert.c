@@ -13,6 +13,8 @@ SNEPPXSERConfig SNEPPX_ser_config_default(void) {
     cfg.top_k_method = SNEPPX_TOPK_GREEDY;
     cfg.load_balance_coef = 0.01f;
     cfg.dropout_rate = 0.0f;
+    cfg.use_mlp_gater = 0;
+    cfg.gater_hidden_dim = 64;
     return cfg;
 }
 
