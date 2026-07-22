@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.1.1 — Current (2026-06-30)
+## v0.1.1 — Baseline (2026-06-30)
 
 - Multi-head attention with RoPE, causal mask, KV-cache, batched matmul 3D
 - Inference engine: autoregressive generation, top-k/top-p/temperature, token streaming
@@ -15,13 +15,13 @@
 | Autodiff | Real C gradients for all 50+ tensor ops | Backward matches numerical gradient |
 | Optimizer | SGD + AdamW with weight decay & LR scheduling | Converges on toy problems |
 | HSS | Parallel scan over state dimension | 2x speedup vs sequential |
-| SER | Learned gating (tiny MLP per expert) | 5% perplexity improvement |
-| ARC | Real attack simulation during training | Robust to epsilon=0.1 FGSM |
-| NPE | JIT compilation of attention/MLP programs | 10x VM speedup |
-| FM | Single-node on-device sync (simulated multi-node) | Correct gradient aggregation |
-| Trainer | CPU training loop with checkpointing | 10k steps WikiText-2 in 24h |
-| Python API | Tensor, Variable, Tape, Model, Trainer classes | API complete for demo |
-| Testing | 200+ tests, all pass | 100% coverage of exposed API |
+| SER | Learned gating (tiny MLP per expert) with autodiff | 5% perplexity improvement |
+| ARC | Real attack simulation during training (FGSM/PGD/CW) | Robust to epsilon=0.1 FGSM |
+| NPE | JIT pipeline (DCE+constfold+fuse+specialize), auto-JIT VM | 10x VM speedup |
+| FM | Single-node NCCL sync bridge with callback pattern | Correct gradient aggregation |
+| Trainer | CPU training loop with CUDA optimizer acceleration | 10k steps WikiText-2 in 24h |
+| Python API | ARC/NPE/FM/Trainer wrappers, adversarial train graph | API complete for demo |
+| Testing | 200+ tests, all pass; CUDA optimizer + Python wrapper tests | 100% coverage of exposed API |
 
 ## v1.0.0 — Competitive with GPT-2 (18 months)
 
