@@ -27,6 +27,7 @@ typedef struct {
     float output_verify_threshold;
     int adversarial_training;
     int attack_simulation_types;
+    float attack_epsilon;
 } SNEPPXARCConfig;
 
 typedef struct {
@@ -79,5 +80,10 @@ int SNEPPX_arc_build_train_graph(SNEPPXARCLayer* layer, SNEPPXTape* tape,
                                 SNEPPXVariable* input_var,
                                 SNEPPXVariable** weight_vars, size_t num_weights,
                                 SNEPPXVariable** output_var);
+int SNEPPX_arc_build_adversarial_train_graph(SNEPPXARCLayer* layer, SNEPPXTape* tape,
+                                            SNEPPXVariable* input_var,
+                                            SNEPPXVariable** weight_vars, size_t num_weights,
+                                            SNEPPXVariable** clean_output,
+                                            SNEPPXVariable** adv_output);
 
 #endif /* SNEPPX_ARC_H */

@@ -14,6 +14,7 @@ SNEPPXARCConfig SNEPPX_arc_config_default(void) {
     cfg.output_verify_threshold = 0.9f;
     cfg.adversarial_training = 1;
     cfg.attack_simulation_types = SNEPPX_ATTACK_FGSM | SNEPPX_ATTACK_PGD | SNEPPX_ATTACK_CW;
+    cfg.attack_epsilon = 0.1f;
     return cfg;
 }
 

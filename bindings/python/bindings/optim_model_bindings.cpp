@@ -271,6 +271,7 @@ static void init_optim_model(py::module& m) {
         .def_readwrite("output_verify_threshold", &SNEPPXARCConfig::output_verify_threshold)
         .def_readwrite("adversarial_training", &SNEPPXARCConfig::adversarial_training)
         .def_readwrite("attack_simulation_types", &SNEPPXARCConfig::attack_simulation_types)
+        .def_readwrite("attack_epsilon", &SNEPPXARCConfig::attack_epsilon)
         .def("default", &SNEPPX_arc_config_default);
 
     py::class_<SNEPPXNPEConfig>(m, "SNEPPXNPEConfig")

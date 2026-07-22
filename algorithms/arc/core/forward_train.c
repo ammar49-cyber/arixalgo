@@ -33,3 +33,37 @@ int SNEPPX_arc_build_train_graph(SNEPPXARCLayer* layer, SNEPPXTape* tape,
     *output_var = current;
     return 0;
 }
+
+int SNEPPX_arc_build_adversarial_train_graph(SNEPPXARCLayer* layer, SNEPPXTape* tape,
+                                            SNEPPXVariable* input_var,
+                                            SNEPPXVariable** weight_vars, size_t num_weights,
+                                            SNEPPXVariable** clean_output,
+                                            SNEPPXVariable** adv_output) {
+    if (!layer || !tape || !input_var || !weight_vars || !clean_output || !adv_output) return -1;
+
+    int attack_type = layer->config.attack_simulation_types;
+    float epsilon = layer->config.attack_epsilon;
+    if (attack_type == 0) {
+        return SNEPPX_arc_build_train_graph(layer, tape, input_var, weight_vars, num_weights, clean_output);
+    }
+
+    int first_type = 0;
+    if (attack_type & SNEPPX_ATTACK_FGSM) first_type = SNEPPX_ATTACK_FGSM;
+    else if (attack_type & SNEPPX_ATTACK_PGD) first_type = SNEPPX_ATTACK_PGD;
+    else if (attack_type & SNEPPX_ATTACK_CW) first_type = SNEPPX_ATTACK_CW;
+
+    SNEPPXTensor* adv_t = NULL;
+    SNEPPX_arc_simulate_attack(input_var->data, first_type, epsilon, &adv_t);
+    if (!adv_t) return -1;
+
+    SNEPPXVariable* adv_var = SNEPPX_variable_create(adv_t, 0);
+    SNEPPX_tape_record(tape, adv_var);
+
+    int rc = SNEPPX_arc_build_train_graph(layer, tape, input_var, weight_vars, num_weights, clean_output);
+    if (rc != 0) { SNEPPX_tensor_destroy(adv_t); return rc; }
+
+    rc = SNEPPX_arc_build_train_graph(layer, tape, adv_var, weight_vars, num_weights, adv_output);
+    if (rc != 0) { SNEPPX_tensor_destroy(adv_t); return -1; }
+
+    return 0;
+}
