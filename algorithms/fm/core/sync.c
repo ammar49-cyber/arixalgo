@@ -372,3 +372,20 @@ int SNEPPX_fm_receive_gradients(SNEPPXFMController* ctrl, size_t node_id, SNEPPX
     }
     return 0;
 }
+
+int SNEPPX_fm_sync_nccl(SNEPPXFMController* ctrl, SNEPPXFMSyncCallback pg_allreduce, void* context) {
+    if (!ctrl) return 1;
+    if (pg_allreduce) {
+        size_t dim = ctrl->config.memory_dim;
+        size_t n_nodes = ctrl->config.num_nodes;
+        for (size_t n = 0; n < n_nodes; n++) {
+            if (!ctrl->nodes[n]->is_online) continue;
+            SNEPPXFMMemoryBank* bank = ctrl->nodes[n]->memory_bank;
+            if (bank->num_entries == 0) continue;
+            size_t count = bank->num_entries * dim;
+            pg_allreduce((float*)bank->keys->data, count, context);
+            pg_allreduce((float*)bank->values->data, count, context);
+        }
+    }
+    return SNEPPX_fm_sync_all_reduce(ctrl);
+}

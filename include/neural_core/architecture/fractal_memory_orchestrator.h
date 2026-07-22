@@ -68,6 +68,8 @@ void SNEPPX_fm_node_destroy(SNEPPXFMNode* node);
 SNEPPXFMController* SNEPPX_fm_controller_create(const SNEPPXFMConfig* config);
 void SNEPPX_fm_controller_destroy(SNEPPXFMController* ctrl);
 int SNEPPX_fm_sync_all_reduce(SNEPPXFMController* ctrl);
+typedef int (*SNEPPXFMSyncCallback)(void* data, size_t count, void* context);
+int SNEPPX_fm_sync_nccl(SNEPPXFMController* ctrl, SNEPPXFMSyncCallback pg_allreduce, void* context);
 int SNEPPX_fm_sync_gossip(SNEPPXFMController* ctrl, size_t num_pairs);
 int SNEPPX_fm_sync_topology(SNEPPXFMController* ctrl);
 SNEPPXTensor* SNEPPX_fm_compress_gradients(const SNEPPXTensor* gradients, float ratio);
