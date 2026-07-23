@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(SNEPPX_BUILD_TESTS "Build test suite" ON)
+set(BUILD_TESTING ${SNEPPX_BUILD_TESTS})
 option(SNEPPX_BUILD_BENCHMARKS "Build benchmarks" ON)
 option(SNEPPX_BUILD_PYTHON "Build Python bindings" OFF)
 option(SNEPPX_BUILD_CUDA "Build CUDA kernels" OFF)
@@ -171,6 +172,9 @@ target_include_directories(neural_architecture_layer PUBLIC
     $<INSTALL_INTERFACE:include/neural_core/security>
 )
 target_link_libraries(neural_architecture_layer PUBLIC neural_core_kernel)
+
+# Model Zoo - Config and Registry (Phase 1)
+add_subdirectory(algorithms/model_zoo)
 
 if(CORE_SECURITY_C_SRC)
     add_library(neural_security_c STATIC ${CORE_SECURITY_C_SRC})
