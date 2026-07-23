@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-- **CMake** 3.16+
+- **CMake** 3.24+
 - **C11 compiler** (MSVC 2022, GCC 11+, Clang 14+)
 - **C++20** for S2 obfuscation (optional)
-- **Python 3.11+** for bindings (optional)
+- **Python 3.11+** for bindings and test runner (optional)
 - **Git** with GPG or Ed25519 signing configured
 
 ## Quick Start
@@ -13,10 +13,9 @@
 ```bash
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
 cd sneppx-alg
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DSNEPPX_BUILD_TESTS=ON
-cmake --build . -j$(nproc)
-ctest --output-on-failure
+cmake --preset debug
+cmake --build build --config Debug -j$(nproc)
+cd build && ctest --output-on-failure
 ```
 
 ## Workflow
@@ -25,23 +24,23 @@ ctest --output-on-failure
 2. **Develop**: write code, add tests, run locally
 3. **Format**: `clang-format -i -style=file <files>`
 4. **Test**: `ctest --output-on-failure`
-5. **Commit**: `git commit -s -m "component: message"`
-6. **Patch**: `git format-patch -1 HEAD`
-7. **Submit**: email to [algoSNEPPX@gmail.com](mailto:algoSNEPPX@gmail.com)
+5. **Commit**: `git commit -m "component: message"`
+6. **Push**: `git push origin main`
 
 ## Project Layout
 
 ```
 include/neural_core/     # Public headers (kernel, architecture, security)
-kernel/                   # Core implementations (arch, tensor, attention, etc.)
-tests/                    # Unit, integration, benchmark, security tests
+kernel/                   # Core implementations (tensor, autodiff, train, optimizer, attention, distributed, quantization, cuda)
+algorithms/               # Algorithm pipeline (hss, ser, arc, npe, fm)
+tests/                    # Unit, integration, benchmark, security, python tests
 examples/                 # Demo programs
-bindings/                 # Python (pybind11) and Rust bindings
-tools/                    # CLI utilities and benchmarks
+bindings/python/          # Python wrappers (pure Python, no pybind11 needed)
 scripts/                  # Build and development scripts
 cmake/                    # CMake modules
 docs/                     # Documentation
-security/                 # S0-S3 security layer source
+security/                 # S0-S9 security layer source
+config/                   # Model zoo configs
 ```
 
 ## Build Options
@@ -58,10 +57,30 @@ security/                 # S0-S3 security layer source
 
 ## Testing
 
+- **C tests**: `ctest --output-on-failure`
+- **Python tests**: `$env:PYTHONPATH = "bindings/python"; python tests/python/test_*.py`
 - All new features must include tests
-- Run full suite before submitting patches
-- Pre-existing failures: Argon2id (1 timing edge case), SER training (1 edge case)
-- Timeouts: Ed25519 (slow test vectors), thread pool (sleep-based timing)
+- Pre-existing failures: Argon2id (1 timing edge case), Ed25519 (2 verification edge cases)
+
+## Build Targets
+
+| Target | Description |
+|--------|-------------|
+| `neural_core_kernel` | Core tensor/memory/trainer library |
+| `neural_architecture_layer` | Neural architecture algorithms |
+| `neural_security_c` | C security library (S0-S1) |
+| `neural_security_cpp` | C++ security library (S2-S3) |
+| `neural_cuda_kernels` | CUDA kernels (conditional, `SNEPPX_BUILD_CUDA=ON`) |
+
+## Adding a New Algorithm Pipeline Component
+
+1. Create `algorithms/<name>/core/<name>.c` and `include/neural_core/architecture/<name>.h`
+2. Add public API with `SNEPPX_` prefix, `int` return codes, `SNEPPXTensor*` types
+3. Write tests in `tests/unit/test_<name>.c`
+4. Create Python wrapper in `bindings/python/SneppX_ALG/interface_bindings/algo_<name>.py`
+5. Export from `interface_bindings/__init__.py`
+6. Write Python tests in `tests/python/test_<name>.py`
+7. Register in `CMakeLists.txt` (`.c` files picked up by `file(GLOB_RECURSE)`)
 
 ## Code Review
 

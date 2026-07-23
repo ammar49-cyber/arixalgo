@@ -4,11 +4,11 @@
 
 | Tool | Minimum Version | Notes |
 |------|----------------|-------|
-| CMake | 3.16 | Build system |
+| CMake | 3.24 | Build system (4.x recommended for CUDA) |
 | C compiler | C11 | MSVC 2022, GCC 11+, Clang 14+ |
 | C++ compiler | C++20 | Only needed for S2 obfuscation engine |
-| Python | 3.11+ | Optional (for bindings) |
-| pybind11 | 2.10+ | Optional (for Python bindings) |
+| Python | 3.11+ | Optional (for bindings + test runner) |
+| CUDA Toolkit | 12.x | Optional (for CUDA optimizer, `SNEPPX_BUILD_CUDA=ON`) |
 
 ## Linux
 
@@ -22,15 +22,11 @@ sudo apt-get install -y build-essential cmake git
 # Build
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
 cd sneppx-alg
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON
-cmake --build . -j$(nproc)
+cmake --preset release
+cmake --build build --config Release -j$(nproc)
 
 # Test
-ctest --output-on-failure
-
-# Install (optional)
-sudo cmake --install .
+cd build && ctest --output-on-failure
 ```
 
 ### Fedora / RHEL
@@ -40,53 +36,28 @@ sudo dnf install -y gcc gcc-c++ cmake git
 # Same build steps as above
 ```
 
-### Arch Linux
-
-```bash
-sudo pacman -S gcc cmake git
-# Same build steps as above
-```
-
 ## macOS
 
 ### Intel (x86_64)
 
 ```bash
-# Install Homebrew if not present
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install dependencies
 brew install cmake gcc
-
-# Build
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
 cd sneppx-alg
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON
-cmake --build . -j$(sysctl -n hw.ncpu)
-
-# Test
-ctest --output-on-failure
+cmake --preset release
+cmake --build build -j$(sysctl -n hw.ncpu)
+cd build && ctest --output-on-failure
 ```
 
 ### Apple Silicon (ARM64)
 
 ```bash
-# Install Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install dependencies
 brew install cmake
-
-# Build (using Apple Clang; ARM NEON optimizations auto-detected)
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
 cd sneppx-alg
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DSNEPPX_BUILD_TESTS=ON
-cmake --build . -j$(sysctl -n hw.ncpu)
-
-# Test
-ctest --output-on-failure
+cmake --preset release
+cmake --build build -j$(sysctl -n hw.ncpu)
+cd build && ctest --output-on-failure
 ```
 
 ## Windows
@@ -94,34 +65,20 @@ ctest --output-on-failure
 ### Native (Visual Studio)
 
 ```powershell
-# Prerequisites: Visual Studio 2022 with "Desktop development with C++" workload
-# CMake 3.16+ (included with VS 2022)
-
 # Open "Developer Command Prompt for VS 2022"
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
 cd sneppx-alg
-mkdir build
+cmake --preset release
+cmake --build build --config Release
 cd build
-cmake .. -G "Visual Studio 17 2022" -A x64 -DSNEPPX_BUILD_TESTS=ON
-cmake --build . --config Release
-
-# Test
 ctest -C Release --output-on-failure
 ```
 
 ### PowerShell Script
 
 ```powershell
-# From the repository root
 .\scripts\build.ps1 -Config Release -Tests
 .\scripts\test.ps1 -Config Release
-```
-
-### WSL (Windows Subsystem for Linux)
-
-```bash
-# Follow Linux (Ubuntu) instructions above
-# Performance is ~90% of native Linux
 ```
 
 ## Build Options
@@ -131,38 +88,74 @@ ctest -C Release --output-on-failure
 | `SNEPPX_BUILD_TESTS` | ON | Build test suite |
 | `SNEPPX_BUILD_BENCHMARKS` | ON | Build benchmarks |
 | `SNEPPX_BUILD_PYTHON` | OFF | Build Python bindings |
-| `SNEPPX_BUILD_CUDA` | OFF | Build CUDA kernels (future) |
+| `SNEPPX_BUILD_CUDA` | OFF | Build CUDA kernels (requires CUDA Toolkit 12.x) |
 | `SNEPPX_USE_ASAN` | OFF | Enable AddressSanitizer |
 | `SNEPPX_USE_UBSAN` | OFF | Enable UndefinedBehaviorSanitizer |
 | `SNEPPX_USE_LTO` | OFF | Enable Link-Time Optimization |
+| `SNEPPX_BUILD_ZK` | OFF | Build zero-knowledge proof backend |
 
-## Build Configurations
+## CMake Presets
 
-| Config | Flags | Use Case |
-|--------|-------|----------|
-| Debug | `-g -O0` | Development, debugging |
-| Release | `-O3 -DNDEBUG` | Performance testing, benchmarks |
-| RelWithDebInfo | `-O2 -g` | Profiling with debug symbols |
+```bash
+cmake --list-presets
+
+# Available:
+#   debug        — Debug build with tests
+#   release      — Release build with tests
+#   relwithdebinfo — Release with debug info
+#   ninja-release — Ninja + Release
+#   asan         — Debug + AddressSanitizer
+```
+
+## Python Setup
+
+No build needed for pure-Python wrappers:
+
+```powershell
+$env:PYTHONPATH = "bindings/python"
+python -c "from SneppX_ALG import *"
+```
+
+For C-backed Python (optional):
+
+```bash
+# Requires pybind11
+cmake --preset release -DSNEPPX_BUILD_PYTHON=ON
+cmake --build build --config Release
+```
+
+## CUDA Setup
+
+```powershell
+cmake -B build -G "Visual Studio 17 2022" -A x64 `
+    -DSNEPPX_BUILD_TESTS=ON -DSNEPPX_BUILD_CUDA=ON
+cmake --build build --config Release
+```
+
+Requires CUDA Toolkit 12.x with Visual Studio integration.
 
 ## Verify Installation
 
 ```bash
 # Run full test suite
-ctest --output-on-failure
+cd build && ctest --output-on-failure
 
 # Run specific test
-ctest -R test_tensor
+ctest -C Release -R test_tensor
+
+# Run Python tests
+$env:PYTHONPATH = "bindings/python"
+python tests/python/test_algo_wrappers.py
 
 # Run benchmarks
 ./tests/benchmark/bench_tensor
-./tests/benchmark/bench_autodiff
 ```
 
 ## Troubleshooting
 
 ### Build fails: "cannot open program database"
 
-This is a known MSVC parallel build issue. The CMakeLists.txt includes `/FS` flag to fix it. If you still see it:
+MSVC parallel build issue. The CMakeLists.txt includes `/FS` flag. If still failing:
 
 ```bash
 cmake --build . --config Release -j1
@@ -170,30 +163,19 @@ cmake --build . --config Release -j1
 
 ### Test fails: "Ed25519 verify" or "Argon2 timing"
 
-These are pre-existing S0 edge case failures. They do not affect security. See [SECURITY.md](../SECURITY.md) for details.
+Pre-existing S0 edge case failures (2/306 Ed25519 vectors, 1/4 Argon2 timing). Not security vulnerabilities.
+
+### CMake 4.x version error
+
+If CMake fails with `invalid version string '0.9.7.890e'`, ensure you have the latest commit with the fixed `CMakeLists.txt` version `0.9.7`.
 
 ### Python import fails
 
-Ensure the `.pyd` file is in the Python path:
-
 ```powershell
-# Windows
-copy build\Release\SneppX_ALG_core.pyd src\python\SneppX_ALG\
+$env:PYTHONPATH = "bindings/python"
+python -c "import SneppX_ALG; print(SneppX_ALG.__file__)"
 ```
 
-### CMake not found
+### CUDA not found
 
-```bash
-# Ubuntu
-sudo apt-get install cmake
-
-# macOS
-brew install cmake
-
-# Windows
-# Install Visual Studio 2022 with CMake component
-```
-
-### "undefined reference to" errors
-
-Ensure you're linking against the correct libraries. Core tests link `SNEPPX_core;SNEPPX_arch`. Security tests additionally link `SNEPPX_security_c` or `SNEPPX_security_cpp`.
+Ensure `CUDA_PATH` environment variable is set and points to CUDA Toolkit 12.x.

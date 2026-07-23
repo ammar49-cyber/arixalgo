@@ -1,45 +1,51 @@
 # Incident Response Framework
 
-SneppX-ALG provides a comprehensive incident response framework aligned with NIST SP 800-61 Rev 2.
+## Overview
+
+The SNEPPX-ALG incident response framework provides structured handling of security incidents, from detection through recovery.
 
 ## Phases
 
-1. **Preparation** - Tools, playbooks, training, communication plans
-2. **Detection & Analysis** - Alert triage, initial scope, evidence collection
-3. **Containment, Eradication & Recovery** - Short-term and long-term actions
-4. **Post-Incident Activity** - Lessons learned, evidence retention, metrics
+### 1. Detection
+- S3 Behavioral Monitor: real-time anomaly detection (frequency, timing, integrity)
+- S4 Network Security: DDoS detection, connection anomalies
+- S9 Self-audit: scheduled consistency checks across all security layers
+- Structured logging: all security events logged via S6 audit system
 
-## Playbook System
+### 2. Triage
+- Severity classification: CRITICAL, HIGH, MEDIUM, LOW
+- Automated alerting: S6 audit log -> notification
+- Impact assessment: determine scope and affected components
 
-The playbook engine supports:
-- Automated and manual steps
-- Conditions, variables, and branching
-- Sub-playbook composition
-- Audit logging of all actions
-- Rollback procedures
+### 3. Containment
+- Network-level: IP blacklisting via S4 DDoS mitigation
+- Process-level: graceful degradation of affected components
+- Data-level: secure wipe of potentially compromised memory regions (S1)
 
-## Evidence Management
+### 4. Eradication
+- Root cause analysis using S3 behavioral monitor traces
+- S8 formal verification to prove fix correctness
+- S7 secure update deployment
 
-The evidence manager provides:
-- Cryptographic chain-of-custody (hash chains)
-- Encryption and compression at rest
-- Export/import for legal proceedings
-- Full-text search across evidence
-- Tamper detection
+### 5. Recovery
+- Failover to redundant components
+- Restore from S6 checkpoint with S1 integrity verification
+- Gradual roll-out with health-check gating (S7)
 
-## Forensics Modules
+### 6. Post-Mortem
+- Security report generation (S9)
+- Update threat model and attack trees
+- Adjust STRIDE ratings based on findings
 
-- Memory analysis (Volatility-compatible plugin system)
-- Disk image analysis
-- Network capture (PCAP/NETFLOW) analysis
-- Registry hive analysis
-- Malware scanning with YARA
-- Timeline/Super-timeline generation
+## Communication
 
-## Reporting
+- **Security incidents**: algoSNEPPX@gmail.com
+- **Disclosure policy**: 90-day coordinated disclosure
+- **Bug bounty**: No bug bounty program at this time
 
-All IR activities generate:
-- Executive summaries
-- Technical findings
-- Remediation recommendations
-- Compliance mappings (NIST, ISO 27001, PCI DSS)
+## Tools
+
+- S3 Behavioral Monitor: runtime anomaly detection
+- S8 Formal Verification: proofs of fix correctness
+- S9 Penetration Testing: fuzzing and self-audit
+- S6 Audit Logging: structured JSON incident timeline

@@ -2,7 +2,7 @@
 
 ## Overview
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor agreement, patch format, coding style, and governance model.
+SNEPPX-Algo accepts contributions via email patches. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor agreement.
 
 ## Development Workflow
 
@@ -10,106 +10,65 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor agreement, pa
 
 ```bash
 git clone https://github.com/ammar49-cyber/sneppx-alg.git
-cd SneppX-ALG
-mkdir build && cd build
-
-# Debug build for development
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DSNEPPX_BUILD_TESTS=ON
-cmake --build . -j$(nproc)
-
-# Run tests
-ctest --output-on-failure
+cd sneppx-alg
+cmake --preset debug
+cmake --build build --config Debug -j$(nproc)
+cd build && ctest --output-on-failure
 ```
 
 ### Code Organization
 
 | Directory | Content |
 |-----------|---------|
-| `src/core/` | Foundation: tensor, memory, thread, autodiff, optimizer |
-| `src/arch/` | Algorithm pipeline: HSS, SER, ARC, NPE, FM |
-| `src/security/c/` | S0-S1 security primitives (C) |
-| `src/security/cpp/` | S2-S3 security engine (C++) |
-| `src/security/asm/` | Assembly helpers |
-| `src/python/` | Python bindings |
-| `tests/unit/` | Unit tests per component |
-| `tests/integration/` | Integration tests |
-| `tests/benchmark/` | Performance benchmarks |
-| `tests/security/` | Security tests |
+| `include/neural_core/` | Public headers |
+| `kernel/` | Core implementations (tensor, memory, autodiff, optimizer, trainer) |
+| `algorithms/` | Algorithm pipeline (HSS, SER, ARC, NPE, FM) |
+| `security/` | S0-S9 security layer (crypto, memory, obfuscation, monitor, network, AI sanitizer, key vault, updates, formal, pentest) |
+| `bindings/python/` | Python wrappers (pure Python, no pybind11 required) |
+| `tests/` | C and Python test suites |
 | `examples/` | Demos and examples |
 
 ### Testing
 
-```bash
-# Run all tests
-ctest --output-on-failure
+```powershell
+# C tests
+cd build && ctest -C Release --output-on-failure
 
-# Run specific test
-ctest -R test_tensor
-
-# Run benchmarks
-./tests/benchmark/bench_tensor
-./tests/benchmark/bench_autodiff
-```
-
-### Build Options
-
-```bash
-cmake .. -DSNEPPX_BUILD_TESTS=ON       # Build tests (default: ON)
-cmake .. -DSNEPPX_BUILD_BENCHMARKS=ON  # Build benchmarks (default: ON)
-cmake .. -DSNEPPX_BUILD_PYTHON=ON      # Build Python bindings
-cmake .. -DSNEPPX_USE_ASAN=ON          # Enable AddressSanitizer
-cmake .. -DSNEPPX_USE_UBSAN=ON         # Enable UndefinedBehaviorSanitizer
-cmake .. -DSNEPPX_USE_LTO=ON           # Enable Link-Time Optimization
-```
-
-### Presets
-
-```bash
-# Available presets
-cmake --list-presets
-
-# Use a preset
-cmake --preset debug
-cmake --preset release
-cmake --preset relwithdebinfo
-cmake --preset ninja-release
-cmake --preset asan
+# Python tests
+$env:PYTHONPATH = "bindings/python"
+python tests/python/test_algo_wrappers.py
 ```
 
 ## Contribution Areas
 
-### Good First Issues
+### Beginner Friendly
 
-- Add new tensor operations and fused kernels (see `kernel/tensor/`)
+- Add new tensor operations and fused kernels
 - Improve test coverage for edge cases
 - Fix compiler warnings on non-MSVC platforms
 - Add documentation for existing functions
 - Optimize memory allocation paths
 
-### Medium Difficulty
+### Intermediate
 
-- Extend the autodiff backward pass with new ops (C gradients)
+- Extend the autodiff backward pass with new ops
 - Add Python bindings for tensor operations
 - Extend CUDA kernels (new GEMM/attention variants)
 - Add GPU detection and fallback logic
-- Extend the parallel thread pool
 
 ### Advanced
 
-- Implement HSS parallel scan
-- Implement SER learned gating
-- Complete S2 obfuscation engine
-- Complete S3 behavioral monitor
-- NPE JIT compilation
-- FM distributed synchronization
+- NPE JIT optimization passes (loop unrolling, reordering)
+- NCCL distributed training with multi-node support
+- Flash Attention v3 TMA+WGMMA full implementation
+- Quantization-aware training integration
+- Zero-knowledge proof backend for NPE execution
 
 ## Communication
 
 - **Patches**: algoSNEPPX@gmail.com
 - **Security**: algoSNEPPX@gmail.com
-- **Conduct**: algoSNEPPX@gmail.com
-- **No**: GitHub issues, Discord, Slack
 
 ## Code Review
 
-Patches are reviewed by the BDFL. Expect feedback within 7 days. Address all comments and resend.
+Patches are reviewed by the project maintainer. Expect feedback within 7 days.

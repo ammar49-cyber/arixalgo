@@ -1,52 +1,237 @@
 # Python API Reference
 
-## Status: ⚠️ Partial (v0.1.0)
-
-Python bindings are built via Pybind11 (71 KB `bindings.cpp`) when `SNEPPX_BUILD_PYTHON=ON`.
-Ready for forward-pass usage; backward/training depends on autodiff implementation.
+**Status**: v0.5.0 — All algorithm wrappers complete. C backend interface via `_HAS_C` flag.
 
 ## Installation
 
-```bash
-pip install -e src/python
+```powershell
+$env:PYTHONPATH = "bindings/python"
+python -c "from SneppX_ALG import *"
 ```
 
-Build with Python bindings:
-```bash
-cmake -B build -DSNEPPX_BUILD_PYTHON=ON
-cmake --build build
+No C compilation needed — wrappers are pure Python with optional C backend.
+
+## Package Structure
+
+```
+SneppX_ALG/
+  __init__.py                   # Re-exports all public classes
+  interface_bindings/
+    __init__.py                  # Per-algorithm imports
+    tensor.py                    # Tensor class (C-backed or pure NumPy)
+    nn.py                        # Linear, Sequential layers
+    train.py                     # TrainConfig, CUDA optimizer flag
+    optim.py                     # Optimizer wrapper (SGD/AdamW)
+    data.py                      # Data pipeline (TextDataset, BPE)
+    algo_arc.py                  # ARCLayer, ARCAdversarialTrainGraph
+    algo_npe.py                  # NPEInstruction, NPEProgram, NPECompiler, NPEVM
+    algo_fm.py                   # FMController, FMSyncNCCL
+    algo_hss.py                  # HSSModel
+    algo_ser.py                  # SERModel
+    checkpoint.py                # Checkpoint coordinator, fault tolerance
+    profiler.py                  # Profiler, Timer decorator
+    model_zoo.py                 # from_pretrained(), model configs
+    quantization.py              # QuantMode, QuantizedLinear
 ```
 
-## Quick Start
+## Core Types
+
+### Tensor
 
 ```python
-import SneppX_ALG as ax
+from SneppX_ALG import Tensor
 
-# Create a tensor
-t = ax.Tensor.randn((4, 8, 16), dtype=ax.float32)
+t = Tensor(np.random.randn(4, 8).astype(np.float32))
+arr = t.numpy()          # -> np.ndarray
+val = t.item()            # -> float
+t2 = Tensor.zeros(4, 8)
+t3 = Tensor.ones(4, 8)
+t4 = Tensor.randn(4, 8)
+t5 = Tensor.from_numpy(np.array(...))
+
+# Operator overloads
+c = a + b      # __add__
+c = a - b      # __sub__
+c = a * b      # __mul__
+c = a / b      # __truediv__
+c = a @ b      # __matmul__
+c = -a         # __neg__
 ```
 
-## Components (v0.9.7.890e)
+### Model
 
-| Component | Module | Status |
-|-----------|--------|--------|
-| Tensor | `ax.Tensor` `ax.tensor.*` | ✅ Creation, ops, reductions, IO, NN |
-| Autodiff | `ax.Variable` `ax.Tape` | ✅ Forward + backward (real autodiff tape; layer-norm gamma/beta gradient fixed in v0.9.7.890e) |
-| Optimizer | `ax.SGD` `ax.Adam` | ✅ SGD / Adam step |
-| HSS | `ax.HSSModel` | ✅ Forward + training (`test_train_integration` converges deterministically) |
-| SER | `ax.SERModel` | ✅ Forward pass |
-| ARC | `ax.ARCModel` | ✅ Forward pass |
-| NPE | `ax.NPEModel` | ✅ Compile + execute |
-| FM | `ax.FMModel` | ✅ Read/write/sync |
-| Trainer | `ax.Trainer` | ✅ Training loop (tape backward + optimizer step) |
-| Security | `ax.s0`–`ax.s9` | ✅ S0–S9 complete |
+```python
+from SneppX_ALG import Model
 
-## Environment Setup
+model = Model({'input_dim': 8, 'output_dim': 8})
+out = model.forward(np.random.randn(1, 4, 8).astype(np.float32))
+model.train()
+model.eval()
+```
+
+## Algorithm Wrappers
+
+### ARC
+
+```python
+from SneppX_ALG.interface_bindings.algo_arc import ARCLayer, ARCAdversarialTrainGraph
+
+# Defense layer
+layer = ARCLayer(input_dim=16, output_dim=16)
+output = layer.forward(input_array)
+adversarial = layer.simulate_attack(input_array, attack_type=1, epsilon=0.1)
+
+# Adversarial training graph
+builder = ARCAdversarialTrainGraph(attack_epsilon=0.1)
+clean_out, adv_out = builder.build(weights, x_clean)
+```
+
+### NPE + JIT
+
+```python
+from SneppX_ALG.interface_bindings.algo_npe import NPECompiler, NPEProgram, NPEVM
+
+# Compile a program
+compiler = NPECompiler()
+prog = compiler.compile([])
+opt = compiler.jit_optimize(prog)   # DCE + matmul+relu fusion
+
+# Execute in VM
+vm = NPEVM()
+vm.load_program(opt)
+output = vm.run(input_array)
+```
+
+### FM + NCCL
+
+```python
+from SneppX_ALG.interface_bindings.algo_fm import FMController, FMSyncNCCL
+
+ctrl = FMController(num_nodes=4, memory_dim=64, memory_capacity=100)
+output = ctrl.forward(node_id=0, input_array)
+
+# NCCL sync with callback
+nccl = FMSyncNCCL()
+def my_callback(data, ctx):
+    return data
+result = nccl.sync(data_array, callback=my_callback)
+```
+
+### SER
+
+```python
+from SneppX_ALG.interface_bindings import SERModel
+
+ser = SERModel(num_experts=8, num_active=2, input_dim=32, expert_dim=64, output_dim=32)
+output = ser.forward(input_array)
+params = ser.parameters()
+```
+
+### HSS
+
+```python
+from SneppX_ALG.interface_bindings import HSSModel
+
+hss = HSSModel(state_dim=16, input_dim=8, output_dim=8)
+output = hss.forward(input_array)
+```
+
+## Training
+
+```python
+from SneppX_ALG.interface_bindings.train import TrainConfig
+from SneppX_ALG import Trainer
+
+# CPU training
+config = TrainConfig()
+config.learning_rate = 0.01
+config.use_cuda_optimizer = False   # default
+
+# CUDA optimizer
+config.use_cuda_optimizer = True    # requires SNEPPX_HAS_CUDA
+
+model = Model({'input_dim': 8, 'output_dim': 8})
+trainer = Trainer(model, config.__dict__)
+loss = trainer.train_step(input_data, target_data)
+avg_loss = trainer.evaluate(input_data, target_data)
+```
+
+## Utilities
+
+### Optimizer
+
+```python
+from SneppX_ALG import Optimizer
+
+opt = Optimizer(params, lr=0.001, optimizer_type='adamw', weight_decay=0.01)
+opt.step()
+opt.zero_grad()
+```
+
+### Sequential / Linear
+
+```python
+from SneppX_ALG import Sequential, Linear
+
+net = Sequential(
+    Linear(8, 32),
+    Linear(32, 16),
+)
+out = net(np.random.randn(4, 8))
+```
+
+### Checkpoint
+
+```python
+from SneppX_ALG.interface_bindings.checkpoint import CheckpointWriter, CheckpointReader
+
+writer = CheckpointWriter("checkpoint.bin")
+writer.save({"weights": w, "step": 1000})
+
+reader = CheckpointReader("checkpoint.bin")
+data = reader.load()
+```
+
+### Profiler
+
+```python
+from SneppX_ALG.interface_bindings.profiler import Profiler, timeit
+
+profiler = Profiler()
+with profiler.profile("forward"):
+    out = model.forward(data)
+
+@timeit(profiler)
+def my_func():
+    pass
+```
+
+### Quantization
+
+```python
+from SneppX_ALG.interface_bindings.quantization import QuantMode, quantize, dequantize, QuantizedLinear
+
+qlayer = QuantizedLinear(64, 128, mode=QuantMode.INT8_SYM)
+q_out = qlayer.forward(data)
+```
+
+### Model Zoo
+
+```python
+from SneppX_ALG.interface_bindings.model_zoo import get_model_config, from_pretrained
+
+cfg = get_model_config("llama2-7b")
+model = from_pretrained("meta-llama/Llama-2-7b")
+```
+
+## Running Tests
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e src/python
+$env:PYTHONPATH = "bindings/python"
+python tests/python/test_algo_wrappers.py    # 8 tests
+python tests/python/test_tensor.py
+python tests/python/test_quantization.py      # 17 tests
+python tests/python/test_checkpoint.py        # 23 tests
+python tests/python/test_profiler.py          # 13 tests
+python tests/python/test_model_zoo.py         # 49 tests
 ```
-
-The `.pyd` extension module is copied automatically by CMake when `SNEPPX_BUILD_PYTHON=ON`.

@@ -1,5 +1,7 @@
 # C API Reference
 
+Full C API for all SNEPPX-Algo components.
+
 ## Tensor API
 
 **Header**: `#include "SNEPPX_tensor.h"`
@@ -9,33 +11,33 @@
 ```c
 typedef struct SNEPPXTensor SNEPPXTensor;
 typedef enum {
-    SNEPPX_FLOAT32,
-    SNEPPX_FLOAT64,
-    SNEPPX_FLOAT16,
-    SNEPPX_BFLOAT16,
-    SNEPPX_FLOAT8,
+    SNEPPX_BOOL,
+    SNEPPX_INT8,
+    SNEPPX_INT16,
     SNEPPX_INT32,
     SNEPPX_INT64,
-    SNEPPX_INT16,
-    SNEPPX_INT8,
     SNEPPX_UINT8,
-    SNEPPX_BOOL,
+    SNEPPX_FLOAT16,
+    SNEPPX_BFLOAT16,
+    SNEPPX_FLOAT32,
+    SNEPPX_FLOAT64,
+    SNEPPX_FLOAT8,
     SNEPPX_COMPLEX64,
     SNEPPX_COMPLEX128,
-} SNEPPXDtype;
+} SNEPPXDType;
 ```
 
 ### Creation
 
 ```c
-SNEPPXTensor* SNEPPX_tensor_create(const size_t* shape, size_t ndim, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_zeros(const size_t* shape, size_t ndim, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_ones(const size_t* shape, size_t ndim, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_full(const size_t* shape, size_t ndim, SNEPPXDType dtype, double value);
-SNEPPXTensor* SNEPPX_tensor_randn(const size_t* shape, size_t ndim, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_from_buffer(const void* data, const size_t* shape, size_t ndim, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_arange(double start, double step, size_t n, SNEPPXDType dtype);
-SNEPPXTensor* SNEPPX_tensor_identity(size_t n, SNEPPXDType dtype);
+SNEPPXTensor* SNEPPX_tensor_create(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_zeros(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_ones(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_full(const size_t* shape, size_t ndim, SNEPPXDtype dtype, double value);
+SNEPPXTensor* SNEPPX_tensor_randn(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_from_buffer(const void* data, const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_arange(double start, double step, size_t n, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_identity(size_t n, SNEPPXDtype dtype);
 SNEPPXTensor* SNEPPX_tensor_copy(const SNEPPXTensor* src);
 ```
 
@@ -48,268 +50,263 @@ SNEPPXTensor* SNEPPX_tensor_permute(const SNEPPXTensor* a, const int32_t* axes, 
 SNEPPXTensor* SNEPPX_tensor_expand(const SNEPPXTensor* a, const size_t* shape, size_t ndim);
 SNEPPXTensor* SNEPPX_tensor_squeeze(const SNEPPXTensor* a);
 SNEPPXTensor* SNEPPX_tensor_unsqueeze(const SNEPPXTensor* a, int32_t axis);
-SNEPPXTensor* SNEPPX_tensor_slice(const SNEPPXTensor* a, int32_t dim, int32_t start, int32_t end, int32_t step);
-SNEPPXTensor* SNEPPX_tensor_pad(const SNEPPXTensor* a, const int32_t* pad_before, const int32_t* pad_after, size_t ndim);
+SNEPPXTensor* SNEPPX_tensor_slice(const SNEPPXTensor* a, size_t dim, size_t start, size_t end);
+SNEPPXTensor* SNEPPX_tensor_pad(const SNEPPXTensor* a, const size_t* pad_before, const size_t* pad_after, size_t ndim);
 ```
 
-### Arithmetic Operations
+### Arithmetic
 
 ```c
 SNEPPXTensor* SNEPPX_tensor_add(const SNEPPXTensor* a, const SNEPPXTensor* b);
 SNEPPXTensor* SNEPPX_tensor_sub(const SNEPPXTensor* a, const SNEPPXTensor* b);
 SNEPPXTensor* SNEPPX_tensor_mul(const SNEPPXTensor* a, const SNEPPXTensor* b);
 SNEPPXTensor* SNEPPX_tensor_div(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_pow(const SNEPPXTensor* a, double exponent);
-SNEPPXTensor* SNEPPX_tensor_sqrt(const SNEPPXTensor* a);
+SNEPPXTensor* SNEPPX_tensor_pow(const SNEPPXTensor* a, const SNEPPXTensor* b);
 SNEPPXTensor* SNEPPX_tensor_neg(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_abs(const SNEPPXTensor* a);
+SNEPPXTensor* SNEPPX_tensor_sqrt(const SNEPPXTensor* a);
 ```
 
-### Linear Algebra
+### Matmul
 
 ```c
 SNEPPXTensor* SNEPPX_tensor_matmul(const SNEPPXTensor* a, const SNEPPXTensor* b);
 SNEPPXTensor* SNEPPX_tensor_batch_matmul(const SNEPPXTensor* a, const SNEPPXTensor* b);
 ```
 
-### Reduction Operations
+### Reduction
 
 ```c
-SNEPPXTensor* SNEPPX_tensor_sum(const SNEPPXTensor* a, int32_t axis);
-SNEPPXTensor* SNEPPX_tensor_mean(const SNEPPXTensor* a, int32_t axis);
-SNEPPXTensor* SNEPPX_tensor_max(const SNEPPXTensor* a, int32_t axis);
-SNEPPXTensor* SNEPPX_tensor_min(const SNEPPXTensor* a, int32_t axis);
-SNEPPXTensor* SNEPPX_tensor_var(const SNEPPXTensor* a, int32_t axis);
-int32_t SNEPPX_tensor_argmax(const SNEPPXTensor* a);
-int32_t SNEPPX_tensor_argmin(const SNEPPXTensor* a);
+SNEPPXTensor* SNEPPX_tensor_sum(const SNEPPXTensor* a, size_t dim);
+SNEPPXTensor* SNEPPX_tensor_mean(const SNEPPXTensor* a, size_t dim);
+SNEPPXTensor* SNEPPX_tensor_var(const SNEPPXTensor* a, size_t dim);
+float SNEPPX_tensor_max(const SNEPPXTensor* a);
+float SNEPPX_tensor_min(const SNEPPXTensor* a);
+size_t SNEPPX_tensor_argmax(const SNEPPXTensor* a);
+size_t SNEPPX_tensor_argmin(const SNEPPXTensor* a);
 ```
 
-### Comparison Operations
-
-```c
-SNEPPXTensor* SNEPPX_tensor_eq(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_neq(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_lt(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_gt(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_le(const SNEPPXTensor* a, const SNEPPXTensor* b);
-SNEPPXTensor* SNEPPX_tensor_ge(const SNEPPXTensor* a, const SNEPPXTensor* b);
-```
-
-### Unary Operations
+### Unary
 
 ```c
 SNEPPXTensor* SNEPPX_tensor_exp(const SNEPPXTensor* a);
 SNEPPXTensor* SNEPPX_tensor_log(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_sin(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_cos(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_tan(const SNEPPXTensor* a);
 SNEPPXTensor* SNEPPX_tensor_sigmoid(const SNEPPXTensor* a);
 SNEPPXTensor* SNEPPX_tensor_relu(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_softmax(const SNEPPXTensor* a);
 SNEPPXTensor* SNEPPX_tensor_gelu(const SNEPPXTensor* a);
-SNEPPXTensor* SNEPPX_tensor_layer_norm(const SNEPPXTensor* a, double eps);
+SNEPPXTensor* SNEPPX_tensor_silu(const SNEPPXTensor* a);
+SNEPPXTensor* SNEPPX_tensor_softmax(const SNEPPXTensor* a, size_t dim);
+SNEPPXTensor* SNEPPX_tensor_layer_norm(const SNEPPXTensor* a, const SNEPPXTensor* gamma, const SNEPPXTensor* beta, float eps);
 ```
 
-### Utility
-
-```c
-void   SNEPPX_tensor_print(const SNEPPXTensor* a);
-void   SNEPPX_tensor_save(const SNEPPXTensor* a, const char* filename);
-SNEPPXTensor* SNEPPX_tensor_load(const char* filename);
-void   SNEPPX_tensor_destroy(SNEPPXTensor* t);
-void   SNEPPX_tensor_to_host(const SNEPPXTensor* a, void* host_buf);
-void   SNEPPX_tensor_fill(SNEPPXTensor* a, double value);
-size_t SNEPPX_tensor_num_elements(const SNEPPXTensor* a);
-size_t SNEPPX_tensor_size_in_bytes(const SNEPPXTensor* a);
-
-int32_t    SNEPPX_tensor_ndim(const SNEPPXTensor* a);
-const size_t* SNEPPX_tensor_shape(const SNEPPXTensor* a);
-SNEPPXDType  SNEPPX_tensor_dtype(const SNEPPXTensor* a);
-```
+---
 
 ## Autodiff API
 
 **Header**: `#include "SNEPPX_autodiff.h"`
 
+### Tape
+
 ```c
-// Variables
-SNEPPXVariable* SNEPPX_variable_create(SNEPPXTensor* data, bool requires_grad);
-void SNEPPX_variable_destroy(SNEPPXVariable* var);
-SNEPPXTensor* SNEPPX_variable_data(SNEPPXVariable* var);
-SNEPPXTensor* SNEPPX_variable_grad(SNEPPXVariable* var);
-void SNEPPX_variable_zero_grad(SNEPPXVariable* var);
-
-// Tape
 SNEPPXTape* SNEPPX_tape_create(void);
-void SNEPPX_tape_record(SNEPPXTape* tape, const char* op_name,
-                       SNEPPXVariable** inputs, int32_t num_inputs,
-                       SNEPPXVariable** outputs, int32_t num_outputs,
-                       SNEPPXGradFn grad_fn);
-void SNEPPX_tape_backward(SNEPPXTape* tape, SNEPPXVariable* loss);
 void SNEPPX_tape_destroy(SNEPPXTape* tape);
-
-// No-grad context
-void SNEPPX_no_grad_begin(void);
-void SNEPPX_no_grad_end(void);
-bool SNEPPX_no_grad_is_active(void);
-
-// Gradient functions (for tape recording)
-typedef void (*SNEPPXGradFn)(SNEPPXVariable** inputs, int32_t num_inputs,
-                            SNEPPXVariable** outputs, int32_t num_outputs,
-                            SNEPPXTensor* grad_output);
+void SNEPPX_tape_record(SNEPPXTape* tape, SNEPPXVariable* var);
+void SNEPPX_tape_backward(SNEPPXTape* tape, SNEPPXVariable* loss);
+void SNEPPX_tape_zero_grad(SNEPPXTape* tape);
+float SNEPPX_tape_global_norm(SNEPPXTape* tape);
+void SNEPPX_tape_clip_grad_norm(SNEPPXTape* tape, float max_norm);
 ```
+
+### Variable
+
+```c
+SNEPPXVariable* SNEPPX_variable_create(SNEPPXTensor* data, int requires_grad);
+void SNEPPX_variable_destroy(SNEPPXVariable* var);
+void SNEPPX_variable_set_requires_grad(SNEPPXVariable* var, int requires_grad);
+SNEPPXVariable* SNEPPX_variable_detach(SNEPPXVariable* var);
+SNEPPXVariable* SNEPPX_variable_copy(SNEPPXVariable* var);
+void SNEPPX_variable_zero_grad(SNEPPXVariable* var);
+float SNEPPX_variable_item(SNEPPXVariable* var);
+size_t SNEPPX_variable_numel(SNEPPXVariable* var);
+```
+
+### Gradient Ops
+
+```c
+SNEPPXVariable* SNEPPX_add(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* b);
+SNEPPXVariable* SNEPPX_sub(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* b);
+SNEPPXVariable* SNEPPX_mul(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* b);
+SNEPPXVariable* SNEPPX_div(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* b);
+SNEPPXVariable* SNEPPX_matmul(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* b);
+SNEPPXVariable* SNEPPX_mse_loss(SNEPPXTape* tape, SNEPPXVariable* pred, SNEPPXVariable* target);
+SNEPPXVariable* SNEPPX_relu(SNEPPXTape* tape, SNEPPXVariable* a);
+SNEPPXVariable* SNEPPX_sigmoid(SNEPPXTape* tape, SNEPPXVariable* a);
+SNEPPXVariable* SNEPPX_tanh(SNEPPXTape* tape, SNEPPXVariable* a);
+SNEPPXVariable* SNEPPX_softmax(SNEPPXTape* tape, SNEPPXVariable* a, size_t dim);
+SNEPPXVariable* SNEPPX_layer_norm(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* gamma, SNEPPXVariable* beta, float eps);
+SNEPPXVariable* SNEPPX_dropout(SNEPPXTape* tape, SNEPPXVariable* a, float rate, unsigned int seed);
+SNEPPXVariable* SNEPPX_concat(SNEPPXTape* tape, SNEPPXVariable** vars, size_t num_vars, size_t dim);
+SNEPPXVariable* SNEPPX_conv2d(SNEPPXTape* tape, SNEPPXVariable* input, SNEPPXVariable* kernel, size_t stride, size_t pad);
+void SNEPPX_no_grad_enter(void);
+void SNEPPX_no_grad_exit(void);
+```
+
+---
 
 ## Optimizer API
 
 **Header**: `#include "SNEPPX_optimizer.h"`
 
 ```c
-SNEPPXOptimizer* SNEPPX_optimizer_create(double lr);
-void SNEPPX_optimizer_add_parameter(SNEPPXOptimizer* opt, SNEPPXVariable* var);
-void SNEPPX_optimizer_step(SNEPPXOptimizer* opt);
-void SNEPPX_optimizer_zero_grad(SNEPPXOptimizer* opt);
+typedef enum {
+    SNEPPX_OPTIMIZER_SGD,
+    SNEPPX_OPTIMIZER_ADAM,
+    SNEPPX_OPTIMIZER_ADAMW,
+    SNEPPX_OPTIMIZER_RMSPROP,
+    SNEPPX_OPTIMIZER_ADAGRAD,
+} SNEPPXOptimizerType;
+
+SNEPPXOptimizerConfig SNEPPX_optimizer_config_default(void);
+SNEPPXOptimizer* SNEPPX_optimizer_create(const SNEPPXOptimizerConfig* config);
 void SNEPPX_optimizer_destroy(SNEPPXOptimizer* opt);
+void SNEPPX_optimizer_step(SNEPPXOptimizer* opt, SNEPPXTensor** params, SNEPPXTensor** grads, size_t num_params);
+
+// Factory functions
+SNEPPXOptimizer* SNEPPX_sgd_create(float lr, float momentum, float weight_decay);
+SNEPPXOptimizer* SNEPPX_adam_create(float lr, float beta1, float beta2, float eps, float weight_decay);
+SNEPPXOptimizer* SNEPPX_adamw_create(float lr, float beta1, float beta2, float eps, float weight_decay);
+SNEPPXOptimizer* SNEPPX_rmsprop_create(float lr, float alpha, float eps, float momentum, float weight_decay);
+SNEPPXOptimizer* SNEPPX_adagrad_create(float lr, float eps, float weight_decay);
+
+// LR Schedulers
+SNEPPXLRScheduler* SNEPPX_lr_scheduler_step_lr(float* lr_ptr, float gamma, size_t step_size);
+SNEPPXLRScheduler* SNEPPX_lr_scheduler_cosine(float* lr_ptr, float min_lr, float max_lr, size_t total_steps);
+void SNEPPX_lr_scheduler_destroy(SNEPPXLRScheduler* sched);
+void SNEPPX_lr_scheduler_step(SNEPPXLRScheduler* sched, float current_loss);
 ```
 
-## Memory API
+---
 
-**Header**: `#include "SNEPPX_memory.h"`
+## Algorithm APIs
 
-```c
-void* SNEPPX_malloc_aligned(size_t size, size_t alignment);
-void* SNEPPX_malloc_aligned_guarded(size_t size, size_t alignment);
-void  SNEPPX_free_aligned(void* ptr);
-void  SNEPPX_secure_zero(void* ptr, size_t size);
-```
-
-## Thread Pool API
-
-**Header**: `#include "SNEPPX_thread_pool.h"`
-
-```c
-typedef void (*SNEPPXTaskFn)(void* arg);
-
-SNEPPXThreadPool* SNEPPX_thread_pool_create(int32_t num_threads);
-void SNEPPX_thread_pool_enqueue(SNEPPXThreadPool* pool, SNEPPXTaskFn fn, void* arg);
-void SNEPPX_thread_pool_wait(SNEPPXThreadPool* pool);
-void SNEPPX_thread_pool_destroy(SNEPPXThreadPool* pool);
-```
-
-## HSS API
+### HSS
 
 **Header**: `#include "SNEPPX_hss.h"`
 
 ```c
 SNEPPXHSSConfig SNEPPX_hss_config_default(void);
-SNEPPXHSSModel* SNEPPX_hss_model_create(SNEPPXHSSConfig* config, int32_t seed);
-void SNEPPX_hss_forward(SNEPPXHSSModel* model, SNEPPXTensor* input, SNEPPXTensor** output);
+SNEPPXHSSLayer* SNEPPX_hss_layer_create(const SNEPPXHSSConfig* config, unsigned int seed);
+void SNEPPX_hss_layer_destroy(SNEPPXHSSLayer* layer);
+SNEPPXHSSModel* SNEPPX_hss_model_create(const SNEPPXHSSConfig* config, unsigned int seed);
 void SNEPPX_hss_model_destroy(SNEPPXHSSModel* model);
+int SNEPPX_hss_forward(SNEPPXHSSModel* model, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_hss_build_train_graph(SNEPPXHSSModel* model, SNEPPXTape* tape, SNEPPXVariable* input, SNEPPXVariable** params, int n_params, SNEPPXVariable** output);
+SNEPPXTensor** SNEPPX_hss_get_params(SNEPPXHSSModel* model, int* n);
 ```
 
-## SER API
+### SER
 
 **Header**: `#include "SNEPPX_ser.h"`
 
 ```c
 SNEPPXSERConfig SNEPPX_ser_config_default(void);
-SNEPPXSERModel* SNEPPX_ser_model_create(SNEPPXSERConfig* config, int32_t seed);
-void SNEPPX_ser_forward(SNEPPXSERModel* model, SNEPPXTensor* input, SNEPPXTensor** output);
-void SNEPPX_ser_compute_load_balance_loss(SNEPPXSERModel* model, float* loss);
+SNEPPXExpert* SNEPPX_expert_create(const SNEPPXSERConfig* config, unsigned int seed, SNEPPXActivation activation);
+void SNEPPX_expert_destroy(SNEPPXExpert* expert);
+SNEPPXSERLayer* SNEPPX_ser_layer_create(const SNEPPXSERConfig* config, unsigned int seed);
+void SNEPPX_ser_layer_destroy(SNEPPXSERLayer* layer);
+int SNEPPX_ser_forward(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** output);
+float SNEPPX_ser_load_balance_loss(const SNEPPXSERLayer* layer, const SNEPPXTensor* routing_weights);
+int SNEPPX_ser_route_mlp_gated(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** routing_weights);
+SNEPPXSERModel* SNEPPX_ser_model_create(const SNEPPXSERConfig* config, unsigned int seed, size_t num_layers);
 void SNEPPX_ser_model_destroy(SNEPPXSERModel* model);
 ```
 
-## ARC API
+### ARC
 
 **Header**: `#include "SNEPPX_arc.h"`
 
 ```c
 SNEPPXARCConfig SNEPPX_arc_config_default(void);
-SNEPPXARCModel* SNEPPX_arc_model_create(SNEPPXARCConfig* config);
-void SNEPPX_arc_forward(SNEPPXARCModel* model, SNEPPXTensor* input,
-                      SNEPPXTensor** output, SNEPPXTensor** anomaly_scores);
-void SNEPPX_arc_attack_fgsm(SNEPPXARCModel* model, SNEPPXTensor* input,
-                          SNEPPXTensor* gradient, float epsilon);
-void SNEPPX_arc_attack_pgd(SNEPPXARCModel* model, SNEPPXTensor* input,
-                         SNEPPXTensor* gradient, float epsilon, int32_t steps);
-void SNEPPX_arc_model_destroy(SNEPPXARCModel* model);
+SNEPPXARCLayer* SNEPPX_arc_layer_create(const SNEPPXARCConfig* config, size_t input_dim, size_t output_dim, unsigned int seed);
+void SNEPPX_arc_layer_destroy(SNEPPXARCLayer* layer);
+int SNEPPX_arc_forward(SNEPPXARCLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** output, float metrics[4]);
+float SNEPPX_arc_guard_score(const SNEPPXARCLayer* layer, const SNEPPXTensor* input);
+float SNEPPX_arc_verify_score(const SNEPPXARCLayer* layer, const SNEPPXTensor* output);
+int SNEPPX_arc_simulate_attack(SNEPPXARCLayer* layer, const SNEPPXTensor* input, int attack_type, float eps, SNEPPXTensor** adversarial);
+int SNEPPX_arc_build_adversarial_train_graph(SNEPPXARCModel* model, SNEPPXTape* tape,
+    SNEPPXVariable* input, SNEPPXVariable** weights, int n_weights,
+    SNEPPXVariable** clean_out, SNEPPXVariable** adv_out);
 ```
 
-## NPE API
+### NPE
 
 **Header**: `#include "SNEPPX_npe.h"`
 
 ```c
 SNEPPXNPEConfig SNEPPX_npe_config_default(void);
-SNEPPXNPEModel* SNEPPX_npe_model_create(SNEPPXNPEConfig* config);
-int32_t SNEPPX_npe_load_program(SNEPPXNPEModel* model, uint8_t* program, int32_t size);
-void SNEPPX_npe_execute(SNEPPXNPEModel* model, SNEPPXTensor** outputs, int32_t num_outputs);
-int32_t SNEPPX_npe_verify(SNEPPXNPEModel* model);
-void SNEPPX_npe_model_destroy(SNEPPXNPEModel* model);
+SNEPPXNPEProgram* SNEPPX_npe_program_create(size_t max_instructions);
+void SNEPPX_npe_program_destroy(SNEPPXNPEProgram* prog);
+void SNEPPX_npe_program_append(SNEPPXNPEProgram* prog, SNEPPXNPEInstruction inst);
+SNEPPXNPEVM* SNEPPX_npe_vm_create(const SNEPPXNPEConfig* config);
+void SNEPPX_npe_vm_destroy(SNEPPXNPEVM* vm);
+void SNEPPX_npe_vm_load(SNEPPXNPEVM* vm, SNEPPXNPEProgram* program);
+int SNEPPX_npe_vm_run(SNEPPXNPEVM* vm, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_npe_vm_step(SNEPPXNPEVM* vm, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_npe_vm_optimize(SNEPPXNPEVM* vm);
+
+// JIT pipeline
+SNEPPXNPEProgram* SNEPPX_npe_jit_pipeline_compose(SNEPPXNPEProgram* input);
+int SNEPPX_npe_jit_dce(SNEPPXNPEProgram* prog);
+int SNEPPX_npe_jit_constant_fold(SNEPPXNPEProgram* prog);
+int SNEPPX_npe_jit_fuse(SNEPPXNPEProgram* prog);
+
+// Compilers
+SNEPPXNPEProgram* SNEPPX_npe_compile_mlp(size_t input_dim, size_t hidden_dim);
+SNEPPXNPEProgram* SNEPPX_npe_compile_attention(size_t dim);
+int SNEPPX_npe_verify_program(const SNEPPXNPEProgram* prog);
 ```
 
-## FM API
+### FM
 
 **Header**: `#include "SNEPPX_fm.h"`
 
 ```c
 SNEPPXFMConfig SNEPPX_fm_config_default(void);
-SNEPPXFMModel* SNEPPX_fm_model_create(SNEPPXFMConfig* config, int32_t node_id, int32_t seed);
-void SNEPPX_fm_write(SNEPPXFMModel* model, SNEPPXTensor* key, SNEPPXTensor* value);
-void SNEPPX_fm_read(SNEPPXFMModel* model, SNEPPXTensor* query, SNEPPXTensor** output);
-void SNEPPX_fm_sync(SNEPPXFMModel* model, SNEPPXTensor* global_bank,
-                  int32_t* trust_scores, int32_t num_nodes);
-void SNEPPX_fm_model_destroy(SNEPPXFMModel* model);
+SNEPPXFMMemoryBank* SNEPPX_fm_memory_bank_create(size_t capacity, size_t dim);
+void SNEPPX_fm_memory_bank_destroy(SNEPPXFMMemoryBank* bank);
+int SNEPPX_fm_memory_bank_query(SNEPPXFMMemoryBank* bank, const SNEPPXTensor* key, SNEPPXTensor** value, float* similarity);
+int SNEPPX_fm_memory_bank_write(SNEPPXFMMemoryBank* bank, const SNEPPXTensor* key, const SNEPPXTensor* value);
+SNEPPXFMNode* SNEPPX_fm_node_create(size_t node_id, size_t mem_capacity, size_t mem_dim);
+void SNEPPX_fm_node_destroy(SNEPPXFMNode* node);
+SNEPPXFMController* SNEPPX_fm_controller_create(const SNEPPXFMConfig* config);
+void SNEPPX_fm_controller_destroy(SNEPPXFMController* ctrl);
+int SNEPPX_fm_sync_all_reduce(SNEPPXFMController* ctrl, SNEPPXFMNode** nodes, size_t num_nodes, float privacy_epsilon);
+int SNEPPX_fm_sync_nccl(SNEPPXFMController* ctrl, SNEPPXFMSyncCallback callback, void* context);
+SNEPPXTensor* SNEPPX_fm_compress_gradients(const SNEPPXTensor* grad, float compression_ratio);
+int SNEPPX_fm_forward(SNEPPXFMController* ctrl, size_t node_id, const SNEPPXTensor* input, SNEPPXTensor** output);
 ```
 
-## Security API
+### CUDA Trainer Bridge
 
-### S0 — Crypto
-
-**Header**: `#include "SNEPPX_crypto.h"` (includes all sub-headers)
+**Header**: `#include "trainer_cuda.h"`
 
 ```c
-// Ed25519
-int SNEPPX_ed25519_keypair_generate(SNEPPXEd25519Keypair* kp);
-int SNEPPX_ed25519_secret_key_expand(uint8_t* expanded_sk, const uint8_t* seed);
-int SNEPPX_ed25519_sign(const SNEPPXEd25519Keypair* kp, const uint8_t* message, size_t msg_len, SNEPPXEd25519Signature* sig);
-int SNEPPX_ed25519_verify(const uint8_t* public_key, const uint8_t* message, size_t msg_len, const SNEPPXEd25519Signature* sig);
-int SNEPPX_ed25519_scalar_multiply(uint8_t* result, const uint8_t* scalar, const uint8_t* point);
-
-// ChaCha20-Poly1305 (AEAD)
-int SNEPPX_aead_encrypt(uint8_t* ct, size_t* ctlen, const uint8_t* pt, size_t ptlen,
-                       const uint8_t key[32], const uint8_t nonce[12],
-                       const uint8_t* aad, size_t aadlen);
-int SNEPPX_aead_decrypt(uint8_t* pt, size_t* ptlen, const uint8_t* ct, size_t ctlen,
-                       const uint8_t key[32], const uint8_t nonce[12],
-                       const uint8_t* aad, size_t aadlen);
-
-// Hashing
-void SNEPPX_sha512(const uint8_t* input, size_t len, uint8_t* output);
-void SNEPPX_sha3_256(const uint8_t* input, size_t len, uint8_t* output);
-void SNEPPX_blake3(const uint8_t* input, size_t len, uint8_t* output, size_t output_len);
-
-// Key derivation
-int SNEPPX_argon2_hash(uint8_t* hash, size_t hash_len, const uint8_t* pwd, size_t pwd_len,
-                      const uint8_t* salt, size_t salt_len, uint32_t t_cost, uint32_t m_cost);
-
-// Random
-int SNEPPX_random_bytes(uint8_t* buffer, size_t len);
-
-// Constant-time comparison
-int SNEPPX_ct_is_zero(const uint8_t* b, size_t n);
-int SNEPPX_ct_equal(const uint8_t* a, const uint8_t* b, size_t n);
+int SNEPPX_trainer_cuda_available(void);
+int SNEPPX_trainer_cuda_init(size_t mem_pool_size);
+void SNEPPX_trainer_cuda_shutdown(void);
+int SNEPPX_trainer_cuda_transfer(void* dst, const void* src, size_t bytes);
+int SNEPPX_trainer_cuda_to_host(void* dst, const void* src, size_t bytes);
+int SNEPPX_trainer_cuda_optimizer_step(float* params, const float* grads, size_t n, float lr, float weight_decay);
 ```
 
-### S1 — Secure Memory
+---
 
-**Header**: `#include "SNEPPX_secure_mem.h"`
+## Utility API
+
+**Header**: `#include "SNEPPX_memory.h"`
 
 ```c
+void* SNEPPX_malloc(size_t size, size_t alignment);
+void SNEPPX_free(void* ptr, size_t size);
+void* SNEPPX_calloc(size_t count, size_t size, size_t alignment);
 void SNEPPX_secure_zero(void* ptr, size_t size);
-void* SNEPPX_secure_malloc(size_t size);
-void SNEPPX_secure_free(void* ptr, size_t size);
 ```
-
-See `docs/security.md` for full S0-S3 documentation.
-
-See also `docs/security.md` for full S0-S3 documentation.

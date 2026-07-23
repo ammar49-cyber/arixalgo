@@ -2,59 +2,70 @@
 
 ## Defense-in-Depth Layers
 
-The SneppX-ALG security architecture implements a defense-in-depth strategy across seven layers:
+The SNEPPX-ALG security architecture implements a defense-in-depth strategy:
 
-### Layer 1: Hardware & Firmware Security (S10)
-- TPM 2.0 attestation
-- Intel SGX/TDX enclaves
-- AMD SEV-SNP encrypted VMs
-- Trusted boot chain verification
+### S0 - Cryptographic Core
+Provides all cryptographic primitives: signatures (Ed25519, Dilithium 2/3/5, SPHINCS+), encryption (ChaCha20-Poly1305), hashing (SHA-3, BLAKE3), KDF (Argon2id), and PQ key encapsulation (Kyber-512/768/1024). All primitives implement constant-time operations.
 
-### Layer 2: OS & Kernel Hardening (S11)
-- Control-flow integrity (CFI)
-- Shadow stack (CET)
-- Memory tagging (MTE/ASAN)
-- Pointer authentication (PAC)
-- Intel Processor Trace for forensics
+### S1 - Secure Memory
+Guard pages, stack canaries, ASLR, locked memory, secure wipe, constant-time comparison, and memory leak detection. Protected memory for sensitive data (keys, gradients, model weights).
 
-### Layer 3: Network Defense (S12)
-- Intrusion detection/prevention
-- Web application firewall
-- Honeypot network with canary tokens
-- TCP tarpit for attack slowdown
+### S2 - Obfuscation Engine
+Control flow flattening, string encryption, instruction substitution, code virtualization, anti-debug, opaque predicates, anti-dump, multi-VM diversity, IAT protection.
 
-### Layer 4: AI/ML Security (S13 & AI/)
-- Adversarial robustness
-- Federated learning security
-- Model extraction detection
-- Data watermarking
-- Guardrails and content filtering
-- Explainability (SHAP)
+### S3 - Behavioral Monitor
+Runtime integrity monitoring (CRC32), container breakout detection, frequency and timing analysis, statistical anomaly detection.
 
-### Layer 5: Cryptography (Crypto/)
-- Classical: AES-256-GCM, ChaCha20-Poly1305, ECDH, EdDSA
-- Post-quantum: Kyber, Dilithium, Falcon, SPHINCS+, BIKE, HQC
-- Protocols: Noise Protocol Framework, TLS 1.3 extended
+### S4 - Network Security
+DDoS mitigation (SYN flood detection, rate limiting), transport security, identity management, certificate pinning.
 
-### Layer 6: Zero Trust (Zero Trust/)
-- Policy-driven access control
-- Continuous verification
-- Risk-based scoring
-- Session management
+### S5 - AI Sanitizer
+Prompt injection detection, differential privacy (Laplace mechanism), data poisoning defense, RLHF safety, harmful output filtering.
 
-### Layer 7: Identity & Federation (S15)
-- Decentralized identity (DIDs)
-- Verifiable credentials
-- FIDO2/WebAuthn
-- OAuth2 / OIDC
-- Zero-knowledge proofs
+### S6 - Security UI / Key Vault
+Audit logging (structured JSON), encrypted key store with PIN-protected access.
 
-## Cross-Cutting Capabilities
+### S7 - Secure Updates
+Container image verification (OCI), signed update bundles (Ed25519), rollback protection, staged rollout.
 
-- **Threat Intelligence** - Collectors, analyzers, enrichment pipeline
-- **Incident Response** - Playbooks, forensics, evidence management
-- **Compliance** - SOC 2, GDPR, HIPAA, PCI DSS, FedRAMP
-- **Automation** - SOAR engine
-- **Supply Chain** - SBOM management
-- **Chaos Engineering** - Resiliency testing
-- **Blockchain** - Consensus auditing
+### S8 - Formal Verification
+Model checking, invariant verification, symbolic execution for NPE bytecode, container breakout state-machine rules.
+
+### S9 - Penetration Testing
+Network fuzzing, self-audit (internal consistency checks), security report generation, CTF utilities.
+
+## Trust Model
+
+- **Hardware**: Trusted (no CPU side-channel attacks)
+- **OS**: Trusted (no kernel-level compromise)
+- **Network**: Untrusted (MTLS, Noise protocol, QUIC)
+- **Other AI models**: Untrusted and potentially adversarial
+- **Supply chain**: Trusted (verified commits, signed releases)
+
+## Key Security Properties
+
+1. **Confidentiality**: Model weights encrypted at rest (ChaCha20-Poly1305), locked in memory (mlock), never swapped to disk
+2. **Integrity**: Code verified via signatures, memory guarded by canaries, runtime monitored by behavioral analysis
+3. **Availability**: DDoS mitigation, graceful degradation, resource limits
+4. **Privacy**: Differential privacy during training, on-device inference, no telemetry
+5. **Non-repudiation**: Ed25519 signatures on all contributions, audit logging
+
+## Simulation & Visualization
+
+The security architecture can be simulated and visualized using:
+
+```bash
+# Run attack simulations
+python tests/security/test_threat_simulations.py
+
+# Generate security report
+python scripts/security_report.py --output report.json
+```
+
+## See Also
+
+- `docs/security.md` - Full security architecture document
+- `docs/security_layers.txt` - Deep dive into S0-S9
+- `docs/threat_modeling/threat_modeling_overview.md` - Threat modeling methodology
+- `docs/incident_response/ir_framework_overview.md` - Incident response procedures
+- `docs/compliance/compliance_overview.md` - Compliance framework coverage

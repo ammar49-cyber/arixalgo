@@ -1,40 +1,27 @@
-# Compliance Framework Overview
+# Compliance Overview
 
-SneppX-ALG provides compliance frameworks for major standards:
+## Standards Coverage
 
-## Supported Frameworks
+SNEPPX-ALG aligns with the following compliance frameworks:
 
-- **SOC 2** (Type I & II) - Trust Services Criteria
-- **GDPR** - General Data Protection Regulation
-- **HIPAA** - Health Insurance Portability and Accountability Act
-- **PCI DSS** - Payment Card Industry Data Security Standard
-- **FedRAMP** - Federal Risk and Authorization Management Program
+| Standard | Scope | Status |
+|----------|-------|--------|
+| **SOC 2** | Security, availability, confidentiality | Planned (v1.0) |
+| **ISO 27001** | Information security management | Planned (v1.0) |
+| **GDPR** | Data protection, right to explanation | Designed-in (S5 AI sanitizer) |
+| **HIPAA** | Health data privacy | Planned (v2.0) |
+| **FIPS 140-3** | Cryptographic module validation | S0 primitives designed for FM validation (pending formal cert) |
 
-## Shared Capabilities
+## Data Protection
 
-Each framework provides:
-- Automated control assessment
-- Control gap analysis
-- Evidence collection and management
-- Report generation (executive and detailed)
-- Continuous monitoring
-- POAM (Plan of Action and Milestones) generation
-- Vendor/third-party risk assessment
+- **At rest**: All sensitive data encrypted with ChaCha20-Poly1305 (S0)
+- **In transit**: Transport security with handshake padding (S4)
+- **In use**: Differential privacy during training (S5), secure memory lockdown (S1)
+- **After use**: Secure wipe with compiler barrier (S1)
 
-## Workflow
+## Architecture
 
-1. Scope definition
-2. Control mapping to technical assets
-3. Evidence collection (automated and manual)
-4. Assessment and gap analysis
-5. Remediation tracking
-6. Report generation
-7. Continuous monitoring
-
-## Integration
-
-Compliance data feeds into:
-- SIEM dashboards
-- SOAR playbooks
-- Threat intelligence enrichment pipeline
-- Audit log management
+- No central data repository: Federated Memory (FM) with trust-weighted sync
+- Local training: models train on-device, only gradient shares leave
+- Differential privacy: Laplace mechanism with configurable epsilon (S5)
+- Audit logging: structured JSON entries for all security events (S6)

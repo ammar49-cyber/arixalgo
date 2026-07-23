@@ -11,6 +11,13 @@ SNEPPXTensor* SNEPPX_tensor_clone(const SNEPPXTensor* t);
 int SNEPPX_tensor_reshape(SNEPPXTensor* t, const size_t* new_shape, size_t new_ndim);
 int SNEPPX_tensor_copy(SNEPPXTensor* dst, const SNEPPXTensor* src);
 void SNEPPX_tensor_fill(SNEPPXTensor* t, float value);
+SNEPPXTensor* SNEPPX_tensor_zeros(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_ones(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_randn(const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_from_buffer(const void* data, const size_t* shape, size_t ndim, SNEPPXDtype dtype);
+SNEPPXTensor* SNEPPX_tensor_transpose(const SNEPPXTensor* a);
+SNEPPXTensor* SNEPPX_tensor_permute(const SNEPPXTensor* a, const int32_t* axes, size_t ndim);
+SNEPPXTensor* SNEPPX_tensor_slice(const SNEPPXTensor* a, size_t dim, size_t start, size_t end);
 ```
 
 ### Memory (`SNEPPX_memory.h`)
@@ -65,7 +72,7 @@ SNEPPXVariable* SNEPPX_mean(SNEPPXTape* tape, SNEPPXVariable* a, size_t dim);
 SNEPPXVariable* SNEPPX_transpose(SNEPPXTape* tape, SNEPPXVariable* a, size_t dim1, size_t dim2);
 SNEPPXVariable* SNEPPX_dropout(SNEPPXTape* tape, SNEPPXVariable* a, float rate, unsigned int seed);
 SNEPPXVariable* SNEPPX_layer_norm(SNEPPXTape* tape, SNEPPXVariable* a, SNEPPXVariable* gamma, SNEPPXVariable* beta, float eps);
-SNEPPXVariable* SNEPPX_conv2d(SNEPPXTape* tape, SNEPPXVariable* input, SNEPPXVariable* kernel, size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w);
+SNEPPXVariable* SNEPPX_conv2d(SNEPPXTape* tape, SNEPPXVariable* input, SNEPPXVariable* kernel, size_t stride, size_t pad);
 SNEPPXVariable* SNEPPX_concat(SNEPPXTape* tape, SNEPPXVariable** vars, size_t num_vars, size_t dim);
 ```
 
@@ -77,14 +84,12 @@ SNEPPXOptimizer* SNEPPX_optimizer_create(const SNEPPXOptimizerConfig* config);
 void SNEPPX_optimizer_destroy(SNEPPXOptimizer* opt);
 void SNEPPX_optimizer_step(SNEPPXOptimizer* opt, SNEPPXTensor** params, SNEPPXTensor** grads, size_t num_params);
 
-// Convenience factory functions:
 SNEPPXOptimizer* SNEPPX_sgd_create(float lr, float momentum, float weight_decay);
 SNEPPXOptimizer* SNEPPX_adam_create(float lr, float beta1, float beta2, float eps, float weight_decay);
 SNEPPXOptimizer* SNEPPX_adamw_create(float lr, float beta1, float beta2, float eps, float weight_decay);
 SNEPPXOptimizer* SNEPPX_rmsprop_create(float lr, float alpha, float eps, float momentum, float weight_decay);
 SNEPPXOptimizer* SNEPPX_adagrad_create(float lr, float eps, float weight_decay);
 
-// LR Schedulers:
 SNEPPXLRScheduler* SNEPPX_lr_scheduler_step_lr(float* lr_ptr, float gamma, size_t step_size);
 SNEPPXLRScheduler* SNEPPX_lr_scheduler_exponential(float* lr_ptr, float gamma);
 SNEPPXLRScheduler* SNEPPX_lr_scheduler_cosine(float* lr_ptr, float min_lr, float max_lr, size_t total_steps);
@@ -101,6 +106,8 @@ void SNEPPX_hss_layer_destroy(SNEPPXHSSLayer* layer);
 SNEPPXHSSModel* SNEPPX_hss_model_create(const SNEPPXHSSConfig* config, unsigned int seed);
 void SNEPPX_hss_model_destroy(SNEPPXHSSModel* model);
 int SNEPPX_hss_forward(SNEPPXHSSModel* model, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_hss_build_train_graph(SNEPPXHSSModel* model, SNEPPXTape* tape, SNEPPXVariable* input, SNEPPXVariable** params, int n_params, SNEPPXVariable** output);
+SNEPPXTensor** SNEPPX_hss_get_params(SNEPPXHSSModel* model, int* n);
 ```
 
 ### SER (`SNEPPX_ser.h`)
@@ -112,6 +119,7 @@ SNEPPXSERLayer* SNEPPX_ser_layer_create(const SNEPPXSERConfig* config, unsigned 
 void SNEPPX_ser_layer_destroy(SNEPPXSERLayer* layer);
 int SNEPPX_ser_forward(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** output);
 float SNEPPX_ser_load_balance_loss(const SNEPPXSERLayer* layer, const SNEPPXTensor* routing_weights);
+int SNEPPX_ser_route_mlp_gated(SNEPPXSERLayer* layer, const SNEPPXTensor* input, SNEPPXTensor** routing_weights);
 SNEPPXSERModel* SNEPPX_ser_model_create(const SNEPPXSERConfig* config, unsigned int seed, size_t num_layers);
 void SNEPPX_ser_model_destroy(SNEPPXSERModel* model);
 ```
@@ -125,6 +133,9 @@ int SNEPPX_arc_forward(SNEPPXARCLayer* layer, const SNEPPXTensor* input, SNEPPXT
 float SNEPPX_arc_guard_score(const SNEPPXARCLayer* layer, const SNEPPXTensor* input);
 float SNEPPX_arc_verify_score(const SNEPPXARCLayer* layer, const SNEPPXTensor* output);
 int SNEPPX_arc_simulate_attack(SNEPPXARCLayer* layer, const SNEPPXTensor* input, int attack_type, float eps, SNEPPXTensor** adversarial);
+int SNEPPX_arc_build_adversarial_train_graph(SNEPPXARCModel* model, SNEPPXTape* tape,
+    SNEPPXVariable* input, SNEPPXVariable** weights, int n_weights,
+    SNEPPXVariable** clean_out, SNEPPXVariable** adv_out);
 ```
 
 ### NPE (`SNEPPX_npe.h`)
@@ -137,6 +148,16 @@ SNEPPXNPEVM* SNEPPX_npe_vm_create(const SNEPPXNPEConfig* config);
 void SNEPPX_npe_vm_destroy(SNEPPXNPEVM* vm);
 void SNEPPX_npe_vm_load(SNEPPXNPEVM* vm, SNEPPXNPEProgram* program);
 int SNEPPX_npe_vm_run(SNEPPXNPEVM* vm, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_npe_vm_step(SNEPPXNPEVM* vm, const SNEPPXTensor* input, SNEPPXTensor** output);
+int SNEPPX_npe_vm_optimize(SNEPPXNPEVM* vm);
+
+// JIT pipeline
+SNEPPXNPEProgram* SNEPPX_npe_jit_pipeline_compose(SNEPPXNPEProgram* input);
+int SNEPPX_npe_jit_dce(SNEPPXNPEProgram* prog);
+int SNEPPX_npe_jit_constant_fold(SNEPPXNPEProgram* prog);
+int SNEPPX_npe_jit_fuse(SNEPPXNPEProgram* prog);
+
+// Compilers
 SNEPPXNPEProgram* SNEPPX_npe_compile_mlp(size_t input_dim, size_t hidden_dim);
 SNEPPXNPEProgram* SNEPPX_npe_compile_attention(size_t dim);
 int SNEPPX_npe_verify_program(const SNEPPXNPEProgram* prog);
@@ -157,6 +178,7 @@ void SNEPPX_fm_controller_destroy(SNEPPXFMController* ctrl);
 int SNEPPX_fm_sync_all_reduce(SNEPPXFMController* ctrl, SNEPPXFMNode** nodes, size_t num_nodes, float privacy_epsilon);
 int SNEPPX_fm_sync_gossip(SNEPPXFMController* ctrl, SNEPPXFMNode* node, SNEPPXFMNode* peer, size_t dim);
 int SNEPPX_fm_sync_ring(SNEPPXFMController* ctrl, SNEPPXFMNode** nodes, size_t num_nodes, size_t dim);
+int SNEPPX_fm_sync_nccl(SNEPPXFMController* ctrl, SNEPPXFMSyncCallback callback, void* context);
 SNEPPXTensor* SNEPPX_fm_compress_gradients(const SNEPPXTensor* grad, float compression_ratio);
 int SNEPPX_fm_forward(SNEPPXFMController* ctrl, size_t node_id, const SNEPPXTensor* input, SNEPPXTensor** output);
 ```
@@ -181,7 +203,7 @@ void SNEPPX_model_destroy(SNEPPXModel* model);
 int SNEPPX_model_forward(SNEPPXModel* model, const SNEPPXTensor* input, SNEPPXTensor** output);
 ```
 
-### Training (`SNEPPX_train.h`)
+### Training + CUDA Optimizer (`SNEPPX_train.h`, `trainer_cuda.h`)
 
 ```c
 typedef struct {
@@ -190,6 +212,7 @@ typedef struct {
     size_t batch_size;
     size_t log_interval;
     size_t save_interval;
+    int32_t use_cuda_optimizer;    // 0 = CPU optimizer, 1 = CUDA (default: 0)
 } SNEPPXTrainConfig;
 
 SNEPPXTrainConfig SNEPPX_train_config_default(void);
@@ -199,6 +222,14 @@ float SNEPPX_trainer_train_step(SNEPPXTrainer* trainer, const SNEPPXTensor* inpu
 float SNEPPX_trainer_evaluate(SNEPPXTrainer* trainer, const SNEPPXTensor* input, const SNEPPXTensor* target);
 int SNEPPX_trainer_save_checkpoint(SNEPPXTrainer* trainer, const char* path);
 int SNEPPX_trainer_load_checkpoint(SNEPPXTrainer* trainer, const char* path);
+
+// CUDA optimizer bridge (include/neural_core/kernel/trainer_cuda.h)
+int SNEPPX_trainer_cuda_available(void);
+int SNEPPX_trainer_cuda_init(size_t mem_pool_size);
+void SNEPPX_trainer_cuda_shutdown(void);
+int SNEPPX_trainer_cuda_transfer(void* dst, const void* src, size_t bytes);
+int SNEPPX_trainer_cuda_to_host(void* dst, const void* src, size_t bytes);
+int SNEPPX_trainer_cuda_optimizer_step(float* params, const float* grads, size_t n, float lr, float weight_decay);
 ```
 
 ## Python API
@@ -209,22 +240,21 @@ int SNEPPX_trainer_load_checkpoint(SNEPPXTrainer* trainer, const char* path);
 from SneppX_ALG import Tensor
 
 t = Tensor(np.random.randn(4, 8).astype(np.float32))
-arr = t.numpy()          # → np.ndarray
-val = t.item()            # → float (scalar)
-t2 = t.to('cuda')         # device transfer
-t3 = Tensor.zeros(4, 8)   # static factory
-t4 = Tensor.ones(4, 8)
-t5 = Tensor.randn(4, 8)
+arr = t.numpy()            # -> np.ndarray
+val = t.item()             # -> float (scalar)
+t2 = Tensor.zeros(4, 8)    # static factory
+t3 = Tensor.ones(4, 8)
+t4 = Tensor.randn(4, 8)
 
 # Operator overloads:
-c = a + b          # __add__
-c = a - b          # __sub__
-c = a * b          # __mul__
-c = a / b          # __truediv__
-c = a @ b          # __matmul__
-c = -a             # __neg__
-c = a ** 2         # __pow__
-c = a[0:2]         # __getitem__
+c = a + b                    # __add__
+c = a - b                    # __sub__
+c = a * b                    # __mul__
+c = a / b                    # __truediv__
+c = a @ b                    # __matmul__
+c = -a                       # __neg__
+c = a ** 2                   # __pow__
+c = a[0:2]                   # __getitem__
 ```
 
 ### Model
@@ -234,35 +264,77 @@ from SneppX_ALG import Model
 
 model = Model({'input_dim': 8, 'output_dim': 8})
 out = model.forward(np.random.randn(1, 4, 8).astype(np.float32))
-# out → Tensor with shape (4, 8)
+# out -> Tensor with shape (4, 8)
 model.train()  # training mode
 model.eval()   # evaluation mode
 ```
 
-### Linear Layer
+### ARC (Adversarial Robustness)
 
 ```python
-from SneppX_ALG import Linear
+from SneppX_ALG.interface_bindings.algo_arc import ARCLayer, ARCAdversarialTrainGraph
 
-layer = Linear(8, 16)  # in_features, out_features
-out = layer(torch.randn(4, 8))
-params = layer.parameters()  # [weight, bias]
+layer = ARCLayer(input_dim=16, output_dim=16)
+output = layer.forward(input_array)
+adversarial = layer.simulate_attack(input_array, attack_type=1, epsilon=0.1)
+
+# Adversarial training graph builder
+builder = ARCAdversarialTrainGraph(attack_epsilon=0.1)
+clean_out, adv_out = builder.build(weights, x_clean)
 ```
 
-### Sequential
+### NPE (Neural Program Executor + JIT)
 
 ```python
-from SneppX_ALG import Sequential, Linear
+from SneppX_ALG.interface_bindings.algo_npe import NPEVM, NPECompiler, NPEProgram
 
-net = Sequential(
-    Linear(8, 32),
-    Linear(32, 16),
-    Linear(16, 4),
-)
-out = net(torch.randn(4, 8))
+vm = NPEVM()
+vm.load_program(program_bytes)
+output = vm.run(input_array)
+
+# JIT compilation
+compiler = NPECompiler()
+prog = compiler.compile([])                # compile empty program
+opt_prog = compiler.jit_optimize(prog)     # DCE + fusion optimization
 ```
 
-### Optimizer
+### FM (Federated Memory + NCCL)
+
+```python
+from SneppX_ALG.interface_bindings.algo_fm import FMController, FMSyncNCCL
+
+ctrl = FMController(num_nodes=4, memory_dim=64, memory_capacity=100)
+output = ctrl.forward(node_id=0, input_array)
+ctrl.sync()
+
+# NCCL sync bridge
+nccl_sync = FMSyncNCCL()
+def my_callback(data, ctx):
+    return data
+result = nccl_sync.sync(data_array, callback=my_callback)
+```
+
+### SER (Sparse Expert Routing)
+
+```python
+from SneppX_ALG.interface_bindings import SERModel
+
+ser = SERModel(num_experts=8, num_active=2, input_dim=32, expert_dim=64, output_dim=32)
+output = ser.forward(input_array)
+params = ser.parameters()
+```
+
+### Trainer + CUDA Optimizer
+
+```python
+from SneppX_ALG.interface_bindings.train import TrainConfig
+
+config = TrainConfig()
+config.learning_rate = 0.01
+config.use_cuda_optimizer = True   # enable GPU optimizer
+```
+
+### Optimizer (Python bindings)
 
 ```python
 from SneppX_ALG import Optimizer
@@ -272,56 +344,15 @@ opt.step()
 opt.zero_grad()
 ```
 
-### Trainer
+### Sequential / Linear
 
 ```python
-from SneppX_ALG import Model, Trainer
+from SneppX_ALG import Sequential, Linear
 
-model = Model({'input_dim': 8, 'output_dim': 8})
-trainer = Trainer(model, {'learning_rate': 0.01, 'num_epochs': 10})
-
-loss = trainer.train_step(input_data, target_data)
-avg_loss = trainer.evaluate(input_data, target_data)
-trainer.save("checkpoint.bin")
-trainer.load("checkpoint.bin")
-```
-
-### ARC (Adversarial Robustness)
-
-```python
-from SneppX_ALG import ARCLayer
-
-layer = ARCLayer(input_dim=16, output_dim=16)
-output = layer.forward(input_array)
-adversarial = layer.simulate_attack(input_array, attack_type=1, epsilon=0.1)
-```
-
-### NPE (Neural Processing Engine)
-
-```python
-from SneppX_ALG import NPEVM
-
-vm = NPEVM()
-vm.load_program(program_bytes)
-output = vm.run(input_array)
-```
-
-### FM (Federated Memory)
-
-```python
-from SneppX_ALG import FMController
-
-ctrl = FMController(num_nodes=4, memory_dim=64, memory_capacity=100)
-output = ctrl.forward(node_id=0, input_array)
-ctrl.sync()
-```
-
-### SER (Sparse Expert Routing)
-
-```python
-from SneppX_ALG import SERModel
-
-ser = SERModel(num_experts=8, num_active=2, input_dim=32, expert_dim=64, output_dim=32)
-output = ser.forward(input_array)
-params = ser.parameters()
+net = Sequential(
+    Linear(8, 32),
+    Linear(32, 16),
+    Linear(16, 4),
+)
+out = net(np.random.randn(4, 8))
 ```
